@@ -118,8 +118,6 @@ function write_lite()
 
 end
 
-test
-
 function write_data()
 
     open( tokens_name, "w" ) do io
