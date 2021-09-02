@@ -3,9 +3,10 @@ using DelimitedFiles, PyCall; nltk = pyimport("nltk")
 
 tokens_name = "data.glv"
 
-
 # parts of speech tags, eye-read from nltk.upenn_tagset()
 tags = ["\$", "(", ")", ",", "--", ".", "::", "CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNP", "NNPS", "NNS", "PDT", "POS", "PRP", "PRP\$", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WP\$", "WRB", "''"]
+
+delims=[".", ";", "\"", "?", "!"]
 
 # ------------------------------------------------PRE PROCESSING------------------------------------------------
 
@@ -14,7 +15,7 @@ tags = ["\$", "(", ")", ",", "--", ".", "::", "CC", "CD", "DT", "EX", "FW", "IN"
 
 function one_hot( tags::Vector{String}, pos::String )
 
-    zeroes = zeros( length(tags) )
+    zeroes = zeros( Int8, length(tags) )
 
     for i in 1:size( zeroes )[1]
 
@@ -38,7 +39,7 @@ end
 
 function one_hot( tags::Vector{String}, data::Vector{String} )
 
-    zeroes = zeros( length(data), length( tags ) )
+    zeroes = zeros( Int8, length(data), length( tags ) )
 
     for i in 1:length( data )
 
@@ -66,22 +67,6 @@ function filter_clause( clause; f=["\ufeff", string.(0:9)...] )
 end
     
 
-# Pads the clause up to num_states with the given string
-function pad_clause( clause::Vector{String}; filler="..." )
-
-    out = clause
-
-    while( length(out) < num_states )
-
-        push!( out, filler )
-
-    end
-
-    return lowercase.( out )
-
-end
-
-
 function serialize_glove()
 
     open("glove.glv", "w") do io
@@ -99,7 +84,41 @@ function serialize_glove()
 
 end
 
- 
+function write_book( io, tokens )
+
+    gloves = encode( tokens )
+
+    pos_tags::Vector{String} = [ pos[2] for pos in nltk.pos_tag( tokens ) ]
+
+    tags   = one_hot( tags, pos_tags )
+
+    for ( token, i ) in zip( tokens, 1:length( tokens ))
+
+        serialize( io, ( token, gloves[i, :], tags[i, :] ) )
+
+    end
+
+end
+
+function write_lite()
+
+    open( tokens_name, "w" ) do io
+
+        for path in readdir("books")
+
+            lines = reduce( *, readlines( string( pwd(), "/books/", path ) ) )
+
+            tokens = lines |> nltk.word_tokenize |> filter_clause
+
+            write_book( io, tokens )
+
+        end
+
+    end
+
+end
+
+test
 
 function write_data()
 
@@ -109,57 +128,75 @@ function write_data()
 
         tokens = lines |> nltk.word_tokenize |> filter_clause 
 
-        gloves = encode( tokens )
-
-        pos_tags::Vector{String} = [ pos[2] for pos in nltk.pos_tag( tokens ) ]
-
-        for ( token, i ) in zip( tokens, 1:length( tokens ))
-
-            serialize( io, ( token, gloves[i, :], pos_tags[i] ) )
-
-        end
+        write_book( io, tokens )
 
     end
 
 end
 
+# Pads the clause up to num_states with the given string
+function pad_clause( word_vec::Matrix{Float32}, onehot_vec::Matrix{Int8}; filler="..." )
+
+    onehot = one_hot( tags, "." )
+
+    vec    = encode( "." )
+
+    out_vec, out_onehot = word_vec, onehot_vec
+
+    while ( size(out_vec)[2] < num_states )
+
+        cat( out_vec, vec; dims=2 )
+        cat( out_onehot, onehot; dims=2 )
+
+    end
+
+    return out_vec, out_onehot
+
+end
 
 
-function next_clause( io, delims=[".", ";", "\"", "?", "!"] )
+function next_clause( io )
 
-    vec_data::Matrix{ Float32 } = []
+    # word, vec_data::Array{ Float32 }, one_hot::Array{ Int8 } = deserialize( io )
+ 
+    word, vec_data::Array{ Float32 }, _onehot = deserialize( io )
 
-    one_hot::Matrix{ Int8 }     = []
-
-    word, vec, onehot = deserialize( io )
+    onehot  = one_hot( tags, _onehot )
+    _one_hot = Array{Int8}( onehot )
 
     while !( word in delims )
 
-        vec_data = cat(vec, vec_data; dims=1)
-        one_hot  = cat(one_hot, onehot; dims=1)
+        word, vec, _onehot = deserialize( io )
+
+        onehot = one_hot( tags, _onehot )
+
+        vec_data = cat( vec, vec_data; dims=2 )
+        _one_hot  = cat( _one_hot, onehot; dims=2 )
 
         
     end
 
-    return vec_data, one_hot
+    return vec_data, _one_hot
 
 end
-
-
 
 function find_longest_clause()
 
     m = 0
 
-    open( tokens_name ) do io
+    lines  = reduce( *, [ reduce(*, readlines( string( pwd(), "/books/", path ) ) ) for path in readdir("books") ])
 
-        out = next_clause( io )
+    tokens = lines |> nltk.word_tokenize |> filter_clause 
 
-        while out != Nothing
+    println("woa das fast")
 
-            m   = max(m, length( out ) )
+    for token in tokens
 
-            out = next_clause( io )
+        m = m + 1
+
+        if token in delims
+
+            m = 0
 
         end
 
@@ -169,6 +206,6 @@ function find_longest_clause()
 
 end
 
+num_states  = find_longest_clause()
 
-
-write_data()
+# write_data()
