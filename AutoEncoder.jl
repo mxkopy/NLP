@@ -1,5 +1,6 @@
 include("Model.jl")
 include("InceptionVAE.jl")
+include("AudioVAE.jl")
 
 using Flux, Serialization, WAV, Zygote, Distributions, CUDA
  
@@ -53,22 +54,13 @@ Flux.@functor AutoEncoder
 function create_audio_autoencoder( model_size=128, audio_size=1764 )
 
     encoder = Chain(
-    
-        Dense(audio_size, model_size, bias=false),
 
-        Conv( (1, 1), 2 => 16, stride=1),
-
-        Dense(model_size, model_size, celu)
+        audio_coder( audio_size, 2, 4, 3, 3, Conv )
+        audio_coder( (audio_size ÷ 3) + 1,)
     
     )
     
     decoder = Chain(
-
-        Dense(model_size, model_size, celu),
-
-        Conv( (1, 1), 16 => 2, stride=1),
-
-        Dense(model_size, audio_size, bias=false)
             
     )
     
