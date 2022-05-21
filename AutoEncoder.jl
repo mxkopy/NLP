@@ -16,8 +16,8 @@ function create_audio_autoencoder( model_shape=128, sample_size=1764 )
         # Encoding layer
     
         Conv( (3, 1), (2 => 4),  pad=2, stride=1), 
-        Conv( (3, 1), (4 => 8),  pad=2, stride=2), 
-        Conv( (3, 1), (8 => 16), pad=2, stride=2),
+        Conv( (5, 1), (4 => 8),  pad=2, stride=2), 
+        Conv( (5, 1), (8 => 16), pad=2, stride=2),
 
         AdaptiveMeanPool( ( model_shape , 1 ) ),
     
@@ -28,10 +28,10 @@ function create_audio_autoencoder( model_shape=128, sample_size=1764 )
     
         # Decoder layer
 
-        ConvTranspose( (3, 1), 16 => 8, stride=2 ),
+        ConvTranspose( (5, 1), 16 => 8, stride=2 ),
         Upsample( scale=(2, 1) ), 
 
-        ConvTranspose( (3, 1), 8 => 4,  stride=2 ),
+        ConvTranspose( (5, 1), 8 => 4,  stride=2 ),
         Upsample( scale=(2, 1) ), 
 
         ConvTranspose( (3, 1), 4 => 2,  stride=2 ),
@@ -50,32 +50,39 @@ end
 
 function create_video_autoencoder( model_shape=128, sample_size=640 )
 
+    encoder_shape = floor(sqrt(model_shape))
+
     encoder = Chain(
     
-        Conv( (5, 5), (3 => 4),  pad=2, stride=2), 
-        Conv( (5, 5), (4 => 8),  pad=2, stride=3), 
+        Conv( (3, 3), (3 => 4),  pad=2, stride=1), 
+        Conv( (5, 5), (4 => 8),  pad=2, stride=2), 
         Conv( (5, 5), (8 => 16), pad=2, stride=2),
 
-        AdaptiveMeanPool( ( model_shape , model_shape ) ),
-    
-        Dropout(0.5)
+        AdaptiveMeanPool( ( encoder_shape, encoder_shape ) ),
+
+        x -> reshape(x, ( size(x)[1] * size(x)[2], 1, size(x)[3], : ) ),
+
+        Dropout( 0.5 )
     )
     
     decoder = Chain(
 
-        ConvTranspose( (5, 5), 16 => 8, stride=2 ),
+        x -> reshape(x, (encoder_shape, encoder_shape + ceil(sqrt(model_size)) % encoder_shape, 1, :) )
+
+        ConvTranspose( (3, 3), 16 => 8, stride=2 ),
         Upsample( scale=(2, 2) ), 
 
-        ConvTranspose( (5, 5), 8 => 4,  stride=3 ),
-        Upsample( scale=(3, 3) ), 
+        ConvTranspose( (3, 3), 8 => 4,  stride=2 ),
+        Upsample( scale=(2, 2) ),
 
-        ConvTranspose( (5, 5), 4 => 3,  stride=2 ),
+        ConvTranspose( (3, 3), 4 => 3,  stride=2 ),
+        Upsample( scale=(2, 2) ), 
         AdaptiveMeanPool( ( sample_size, sample_size ) )
     
     )
     
-    std          = Dense( model_shape, model_shape, celu )
-    mean         = Dense( model_shape, model_shape, celu )
+    std          = Dense( encoder_shape * encoder_shape, model_shape, celu )
+    mean         = Dense( encoder_shape * encoder_shape, model_shape, celu )
 
     return encoder, decoder, std, mean
 
@@ -116,7 +123,7 @@ end
 
 # Runs a single training iteration with backprop. 
 
-function train_iter( model, opt, parameters, data, model_size=128 )
+function train_iter( model, parameters, opt, data, model_size=128 )
 
     # Generates an array of random floats. These are used for the reparameterization trick
 
@@ -148,7 +155,7 @@ end
 
 # The following functions implement this. 
 
-function save( savename, model, parameters, opt )
+function save_model( savename, model, parameters, opt )
 
     serialize( savename, ( model, parameters, opt ) )
 
@@ -159,7 +166,7 @@ end
 
 # Loading is fairly cheap, since it's done infrequently.
 
-function load( savename )
+function load_model( savename )
 
     return deserialize( savename )
 
@@ -171,7 +178,7 @@ function init_model( model, savename )
     opt = ADAM( 0.01 )
     parameters = Flux.params( model... )
 
-    save( savename, model, parameters, opt )
+    save_model( savename, model, parameters, opt )
 
 end
 
@@ -189,7 +196,7 @@ function train_over_data( model, parameters, opt, iterator, reshape_data )
 
         data = reshape_data( x )
 
-        train_iter( model, opt, parameters, data )
+        train_iter( model, parameters, opt, data )
 
     end
 

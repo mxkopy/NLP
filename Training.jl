@@ -4,7 +4,7 @@ include("Data.jl")
 
 function train_audio()
 
-    model, parameters, opt = load("data/models/audio.bson")
+    model, parameters, opt = load_model("data/models/audio.bson")
 
     num_files = length(readdir("data/audio"))
 
@@ -16,14 +16,14 @@ function train_audio()
 
     end
 
-    save("data/models/audio.bson", model, parameters, opt)
+    save_model("data/models/audio.bson", model, parameters, opt)
 
 end
 
 
 function train_video()
 
-    model, parameters, opt = load("data/models/video.bson")
+    model, parameters, opt = load_model("data/models/video.bson")
 
     num_files = length(readdir("data/video"))
 
@@ -35,6 +35,6 @@ function train_video()
 
     end
 
-    save("data/models/video.bson", model, parameters, opt)
+    save_model("data/models/video.bson", model, parameters, opt)
 
 end
