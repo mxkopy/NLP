@@ -13,13 +13,13 @@ function create_audio_autoencoder( model_size=128, sample_size=1764 )
     encoder = Chain(
     
         Dense(sample_size, model_size),
-        Dense(model_size, model_size, sigmoid)
+        Dense(model_size, model_size, celu),
     
         Dropout(0.5)
     )
     
     decoder = Chain(
-    
+        Dense(model_size, model_size, celu),
         Dense(model_size, sample_size)
             
     )
