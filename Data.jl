@@ -1,4 +1,4 @@
-using FileIO, VideoIO, Images, WAV
+using FileIO, VideoIO, Images, WAV, CUDA
 
 # all video will be at 25 fps
 # all audio will have a samplerate of 44100

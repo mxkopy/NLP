@@ -43,9 +43,9 @@ end
 
 
 
-function normalize( matrix, dims=collect( 2:ndims(matrix) ) )
+function normalize( matrix, dims=2:ndims(matrix) )
 
-    return mapslices( matrix, dims=dims) do vector
+    return mapslices( matrix, dims=collect(dims)) do vector
 
         min = minimum( vector )
         max = maximum( vector )

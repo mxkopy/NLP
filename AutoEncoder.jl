@@ -1,73 +1,64 @@
+include("Model.jl")
+
 using Flux, Serialization, WAV, Zygote, Distributions
-# Model definition.
+ 
+# Both autoencoders have constraints on encoder & decoder output shapes
+# encoders output array (model_size, 1, out_channels, :)
+# decoders output array (H, W, in_channels, :) where H & W are the size of the input data
+# So essentially, we can run both of them on the same training & loss functions 
 
-# A model is a series of nested functions that takes a multidimensional array as input, 
-    # and keeps other multidimensional arrays as parameters (ex: kernels for the convolution function)
 
-# These functions are implemented by the Flux package. 
-
-# Most of everything is agnostic to this definition; as long as there are 5 components the rest of the program doesn't care what they are. 
-# It would be simple to down/upsize. 
-
-function create_audio_autoencoder( model_shape=128, sample_size=1764 )
+function create_audio_autoencoder( model_size=128, sample_size=1764 )
 
     encoder = Chain(
-
-        # Encoding layer
     
-        Conv( (3, 1), (2 => 4),  pad=2, stride=1), 
-        Conv( (5, 1), (4 => 8),  pad=2, stride=2), 
-        Conv( (5, 1), (8 => 16), pad=2, stride=2),
-
-        AdaptiveMeanPool( ( model_shape , 1 ) ),
+        Dense(sample_size, model_size),
+        Dense(model_size, model_size, sigmoid)
     
         Dropout(0.5)
     )
     
     decoder = Chain(
     
-        # Decoder layer
-
-        ConvTranspose( (5, 1), 16 => 8, stride=2 ),
-        Upsample( scale=(2, 1) ), 
-
-        ConvTranspose( (5, 1), 8 => 4,  stride=2 ),
-        Upsample( scale=(2, 1) ), 
-
-        ConvTranspose( (3, 1), 4 => 2,  stride=2 ),
-        Upsample( scale=(2, 1) ), 
-        AdaptiveMeanPool( ( sample_size, 1 ) )
-    
+        Dense(model_size, sample_size)
+            
     )
     
-    std          = Dense( model_shape, model_shape, celu )
-    mean         = Dense( model_shape, model_shape, celu )
+    std          = Dense( model_size, model_size, celu )
+    mean         = Dense( model_size, model_size, celu )
 
-    return encoder, decoder, std, mean
+    return encoder, decoder, mean, std
 
 end    
 
 
-function create_video_autoencoder( model_shape=128, sample_size=640 )
+function create_video_autoencoder( model_size=128, sample_size=640 )
 
-    encoder_shape = floor(sqrt(model_shape))
+    encoder_shape::Integer = ceil(sqrt(model_size))
 
     encoder = Chain(
     
         Conv( (3, 3), (3 => 4),  pad=2, stride=1), 
-        Conv( (5, 5), (4 => 8),  pad=2, stride=2), 
-        Conv( (5, 5), (8 => 16), pad=2, stride=2),
+        Conv( (3, 3), (4 => 8),  pad=2, stride=2), 
+        Conv( (3, 3), (8 => 16), pad=2, stride=2),
+
+
 
         AdaptiveMeanPool( ( encoder_shape, encoder_shape ) ),
 
-        x -> reshape(x, ( size(x)[1] * size(x)[2], 1, size(x)[3], : ) ),
+        x -> reshape(x, ( encoder_shape * encoder_shape, 1, size(x)[3], : ) ),
 
         Dropout( 0.5 )
+
     )
     
     decoder = Chain(
 
-        x -> reshape(x, (encoder_shape, encoder_shape + ceil(sqrt(model_size)) % encoder_shape, 1, :) )
+        AdaptiveMeanPool( ( (encoder_shape - 1) * (encoder_shape - 1), 1) ),
+
+        x -> reshape(x, ((encoder_shape - 1), (encoder_shape - 1), size(x)[3], :) ),
+
+
 
         ConvTranspose( (3, 3), 16 => 8, stride=2 ),
         Upsample( scale=(2, 2) ), 
@@ -77,14 +68,15 @@ function create_video_autoencoder( model_shape=128, sample_size=640 )
 
         ConvTranspose( (3, 3), 4 => 3,  stride=2 ),
         Upsample( scale=(2, 2) ), 
-        AdaptiveMeanPool( ( sample_size, sample_size ) )
+        
+        x -> x[1:sample_size, 1:sample_size, :, :]
     
     )
     
-    std          = Dense( encoder_shape * encoder_shape, model_shape, celu )
-    mean         = Dense( encoder_shape * encoder_shape, model_shape, celu )
+    std          = Dense( encoder_shape * encoder_shape, model_size, celu )
+    mean         = Dense( encoder_shape * encoder_shape, model_size, celu )
 
-    return encoder, decoder, std, mean
+    return encoder, decoder, mean, std
 
 end    
 
@@ -111,98 +103,16 @@ function eval_model( encoder, decoder, mean, std, param, data )
 
 end
 
+
 # The loss function and model evaluation that should be called within the backprop/gradient scope
 
 function loss_function( encoder, decoder, mean, std, param, x )
 
     y = eval_model( encoder, decoder, mean, std, param, x )
     
-    return Flux.Losses.mse( y, x ) , Flux.Losses.kldivergence( softmax( y ), softmax( x ) )
+    return Flux.Losses.mse( y, x ) + Flux.Losses.mse(normalize(y, 3:4), normalize(x, 3:4)), Flux.Losses.kldivergence( softmax( y ), softmax( x ) )
 
 end
-
-# Runs a single training iteration with backprop. 
-
-function train_iter( model, parameters, opt, data, model_size=128 )
-
-    # Generates an array of random floats. These are used for the reparameterization trick
-
-    unit_gaussians = rand( Normal( 1.0, 0.1 ), model_size )
-
-    r_loss, d_loss = 0, 0
-
-    gs = gradient( parameters ) do
-
-        r_loss, d_loss = loss_function( model..., unit_gaussians, data )
-
-        return 2 * r_loss + d_loss
-
-    end
-
-    println('\n', "r ", string(r_loss), " | d ", string(d_loss) )
-
-    Flux.Optimise.update!( opt, parameters, gs )
-
-end
-
-
-
-# Checkpointing is achieved by 
-
-    # serializing the model, its parameters, and the optimizer at its current state 
-
-    # saving the number of iterations done on the current dataset
-
-# The following functions implement this. 
-
-function save_model( savename, model, parameters, opt )
-
-    serialize( savename, ( model, parameters, opt ) )
-
-end
-
-# This function deserializes the model and relevant parameters from the disk, 
-    # and sets the data IOPipe to the checkpointed position. 
-
-# Loading is fairly cheap, since it's done infrequently.
-
-function load_model( savename )
-
-    return deserialize( savename )
-
-end
-
-
-function init_model( model, savename )
-
-    opt = ADAM( 0.01 )
-    parameters = Flux.params( model... )
-
-    save_model( savename, model, parameters, opt )
-
-end
-
-init_audio_model = init_model(create_audio_autoencoder(), "data/models/audio.bson")
-init_video_model = init_model(create_video_autoencoder(), "data/models/video.bson")
-
-reshape_audio =  x -> reshape(x, (size(x)[1], 1, size(x)[2], :) )
-reshape_video =  x -> reshape(x, (size(x)[3], size(x)[2], size(x)[1], :) )
-
-
-
-function train_over_data( model, parameters, opt, iterator, reshape_data )
-
-    for x in iterator
-
-        data = reshape_data( x )
-
-        train_iter( model, parameters, opt, data )
-
-    end
-
-end
-
-
 
 # This is the main driver for doing inference. It runs on command, i.e. almost never. 
 
