@@ -19,6 +19,7 @@ function create_audio_autoencoder( model_size=128, sample_size=1764 )
     )
     
     decoder = Chain(
+
         Dense(model_size, model_size, celu),
         Dense(model_size, sample_size)
             
@@ -110,7 +111,7 @@ function loss_function( encoder, decoder, mean, std, param, x )
 
     y = eval_model( encoder, decoder, mean, std, param, x )
     
-    return Flux.Losses.mse( y, x ) + Flux.Losses.mse(normalize(y, 3:4), normalize(x, 3:4)), Flux.Losses.kldivergence( softmax( y ), softmax( x ) )
+    return Flux.Losses.mse( y, x ), Flux.Losses.kldivergence( softmax( y ), softmax( x ) )
 
 end
 
