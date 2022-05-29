@@ -1,4 +1,4 @@
-using Flux
+using Flux, SliceMap
 
 
 function mask( length, exclude=[] )
@@ -45,12 +45,12 @@ end
 
 function normalize( matrix, dims=2:ndims(matrix) )
 
-    return mapslices( matrix, dims=collect(dims)) do vector
+    return slicemap( matrix, dims=collect(dims) ) do vector
 
-        min = minimum( vector )
-        max = maximum( vector )
+        min_ = minimum( vector )
+        max_ = maximum( vector )
 
-        return 2 * ( (vector .- min) / ( max - min ) ) .- 1
+        return (vector .- min_) / max( ( max_ - min_ ), 0.01 )
 
     end
 
