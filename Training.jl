@@ -58,22 +58,12 @@ end
 
 
 
-function file_iterator( data_itr )
-
-    return Iterators.map( data_itr ) do x
-
-        return Float32.( x )
-
-    end
-
-end
-
 # we have descended into madness
 function directory_iterator( data_dir, data_iterator )
 
     return Iterators.map( filter( x -> !occursin("checkpoint", x), readdir(data_dir, join=true) ) ) do directory
 
-        return file_iterator( data_iterator( directory ) )
+        return data_iterator( directory )
 
     end |> Iterators.flatten
 
@@ -92,7 +82,7 @@ function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=10000 
 
     for (i, data) in enumerate( directory_itr )
 
-        r_loss, d_loss = train_iter( model |> gpu, parameters, opt, data |> gpu )
+        r_loss, d_loss = train_iter( model |> gpu, parameters, opt, Float32.(data) |> gpu )
 
         r_avg, d_avg   = (r_avg + r_loss) / (n + i), (d_avg + d_loss) / (n + i)
 
