@@ -68,7 +68,7 @@ function train_over_data( model, parameters, opt, iterator, reshape_data )
 
     for x in iterator
 
-        data = reshape_data( Float32.( x ) )
+        data = reshape_data( x ) .|> Float32 |> gpu
 
         train_iter( model, parameters, opt, data )
 
@@ -83,6 +83,8 @@ function train_autoencoder( model_dir, data_dir, data_itr, reshaper )
     model, parameters, opt = load_model( model_dir )
 
     model = model |> gpu
+
+    model = fmap(Float32, model)
 
     num_files = length(readdir(data_dir))
 
