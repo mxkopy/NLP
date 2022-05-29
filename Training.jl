@@ -62,7 +62,7 @@ function file_iterator( data_itr )
 
     return Iterators.map( data_itr ) do x
 
-        return Float32.(x)
+        return Float32.( x )
 
     end
 
@@ -90,11 +90,9 @@ function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=10000 
 
     directory_itr            = Iterators.drop( directory_iterator( data_dir, data_iterator ), n )
 
-    model                    = model |> gpu
-
     for (i, data) in enumerate( directory_itr )
 
-        r_loss, d_loss = train_iter( model, parameters, opt, data |> gpu )
+        r_loss, d_loss = train_iter( model |> gpu, parameters, opt, data |> gpu )
 
         r_avg, d_avg   = (r_avg + r_loss) / (n + i), (d_avg + d_loss) / (n + i)
 
