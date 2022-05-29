@@ -4,11 +4,11 @@ include("Data.jl")
 
 # Runs a single training iteration with backprop. 
 
-function train_iter( model, parameters, opt, data, model_size=128 )
+function train_iter( model, parameters, opt, data::Array{Float32}, model_size=128 )
 
     # Generates an array of random floats. These are used for the reparameterization trick
 
-    unit_gaussians = rand( Normal( 1.0, 0.1 ), model_size ) |> gpu
+    unit_gaussians = rand( Normal( 1.0, 0.1 ), model_size ) .|> Float32 |> gpu
 
     r_loss, d_loss = 0, 0
 
@@ -72,7 +72,7 @@ end
 
 
 
-function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=10000 )
+function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=5000 )
 
     model, parameters, opt   = deserialize( model_dir )
 
@@ -82,13 +82,15 @@ function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=10000 
 
     for (i, data) in enumerate( directory_itr )
 
-        r_loss, d_loss = train_iter( model |> gpu, parameters, opt, Float32.(data) |> gpu )
+        r_loss, d_loss = train_iter( model |> gpu, parameters, opt, data |> gpu )
 
         r_avg, d_avg   = (r_avg + r_loss) / (n + i), (d_avg + d_loss) / (n + i)
 
-        println('\r', "r: $r_loss d: $d_loss r_avg: $r_avg d_avg: $d_avg itr# $((n+i) % save_freq)")
+        next_save      = (save_freq - n - i) % save_freq
 
-        if i % save_freq == 0
+        println("\rr: $r_loss d: $d_loss r_avg: $r_avg d_avg: $d_avg next_save: $next_save")
+
+        if next_save == 0
         
             println("model saved!")
             

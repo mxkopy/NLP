@@ -2,13 +2,8 @@ using FileIO, VideoIO, Images, WAV, CUDA
 
 
 # data preprocessing
-reshape_audio =  x -> reshape(x, (size(x)[1], 1, size(x)[2], :) )
-reshape_video =  x -> reshape(x, (size(x)[3], size(x)[2], size(x)[1], :) )
-
-# neural network output processing
-deshape_audio =  x -> reshape(x, ( size(x)[1], :) )
-deshape_video =  x -> reshape(x, ( :, size(x)[2], size(x)[1]) ) |> colorview
-
+reshape_audio =  x -> reshape(Float32.(x), (size(x)[1], 1, size(x)[2], :) )
+reshape_video =  x -> reshape(Float32.(x), (size(x)[3], size(x)[2], size(x)[1], :) )
 
 
 function image_to_array( image )

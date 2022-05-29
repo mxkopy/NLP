@@ -114,7 +114,7 @@ end
 
 # The loss function and model evaluation that should be called within the backprop/gradient scope
 
-function loss_function( encoder, decoder, mean, std, param, x )
+function loss_function( encoder, decoder, mean, std, param, x ) 
 
     y = eval_model( encoder, decoder, mean, std, param, x )
     
