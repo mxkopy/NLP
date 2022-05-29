@@ -1,11 +1,15 @@
 using FileIO, VideoIO, Images, WAV, CUDA
 
-# all video will be at 25 fps
-# all audio will have a samplerate of 44100
+
+
+reshape_audio =  x -> reshape(x, (size(x)[1], 1, size(x)[2], :) )
+reshape_video =  x -> reshape(x, (size(x)[3], size(x)[2], size(x)[1], :) )
+
+
 
 function image_to_array( image )
 
-    return Float32.( image |> channelview )
+    return image |> channelview
 
 end
 

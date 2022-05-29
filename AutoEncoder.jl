@@ -1,6 +1,6 @@
 include("Model.jl")
 
-using Flux, Serialization, WAV, Zygote, Distributions
+using Flux, Serialization, WAV, Zygote, Distributions, CUDA
  
 # Both autoencoders have constraints on encoder & decoder output shapes
 # encoders output array (model_size, 1, out_channels, :)
@@ -34,7 +34,7 @@ function create_audio_autoencoder( model_size=128, sample_size=1764 )
     std          = Dense( model_size, model_size, celu )
     mean         = Dense( model_size, model_size, celu )
 
-    return encoder, decoder, mean, std
+    return encoder |> gpu, decoder |> gpu, mean |> gpu, std |> gpu
 
 end    
 
@@ -45,14 +45,14 @@ function create_video_autoencoder( model_size=128, sample_size=640 )
 
     encoder = Chain(
     
-        Conv( (1, 1), 3 => 6,   pad=2, stride=1),
+        Conv( (1, 1), 3 => 6,         pad=2, stride=1),
 
-        Conv( (3, 3), 6 => 8,   pad=2, stride=2), 
-        Conv( (3, 3), 8 => 8,   pad=2, stride=2),
-        Conv( (3, 3), 8 => 8,   pad=2, stride=2),
-        Conv( (3, 3), 8 => 16,  pad=2, stride=2),
-        Conv( (3, 3), 16 => 16, pad=2, stride=2),
-        Conv( (3, 3), 16 => 16, pad=2, stride=2),
+        Conv( (3, 3), 6 => 8,         pad=2, stride=2), 
+        Conv( (3, 3), 8 => 8, relu,   pad=2, stride=2),
+        Conv( (3, 3), 8 => 8,         pad=2, stride=2),
+        Conv( (3, 3), 8 => 16,        pad=2, stride=2),
+        Conv( (3, 3), 16 => 16, relu, pad=2, stride=2),
+        Conv( (3, 3), 16 => 16,       pad=2, stride=2),
 
         x -> reshape(x, ( size(x)[1] * size(x)[2], 1, size(x)[3], : ) ),
 
@@ -68,25 +68,23 @@ function create_video_autoencoder( model_size=128, sample_size=640 )
 
         x -> reshape(x, (encoder_shape, encoder_shape, size(x)[3], :) ),
 
-        ConvTranspose( (3, 3), 16 => 16, stride=2 ),
-        ConvTranspose( (3, 3), 16 => 16, stride=2 ),
-        ConvTranspose( (3, 3), 16 => 8,  stride=2 ),
-        ConvTranspose( (3, 3), 8 => 8,   stride=2 ),
-        ConvTranspose( (3, 3), 8 => 8,   stride=2 ),
-        ConvTranspose( (3, 3), 8 => 6,   stride=2 ),
+        ConvTranspose( (3, 3), 16 => 16,       stride=2 ),
+        ConvTranspose( (3, 3), 16 => 16, relu, stride=2 ),
+        ConvTranspose( (3, 3), 16 => 8,        stride=2 ),
+        ConvTranspose( (3, 3), 8 => 8,         stride=2 ),
+        ConvTranspose( (3, 3), 8 => 8,         stride=2 ),
+        ConvTranspose( (3, 3), 8 => 6, relu,   stride=2 ),
 
         ConvTranspose( (1, 1), 6 => 3,   stride=1 ),
 
         AdaptiveMeanPool( (sample_size, sample_size) )
-
-        # x -> x[1:sample_size, 1:sample_size, :, :]
     
     )
     
     std          = Dense( model_size, model_size, celu )
     mean         = Dense( model_size, model_size, celu )
 
-    return encoder, decoder, mean, std
+    return encoder |> gpu, decoder |> gpu, mean |> gpu, std |> gpu
 
 end    
 
@@ -121,39 +119,5 @@ function loss_function( encoder, decoder, mean, std, param, x )
     y = eval_model( encoder, decoder, mean, std, param, x )
     
     return Flux.Losses.mse( y, x ), Flux.Losses.kldivergence( softmax( y ), softmax( x ) )
-
-end
-
-# This is the main driver for doing inference. It runs on command, i.e. almost never. 
-
-function autoencode( num_batches )
-
-    model, _, _ = deserialize( savename )
-
-    encoder, decoder, mean, std = model
-
-    out = zeros( sample_size, 1, 2, batches, num_batches )
-
-    io  = open( data_file )
-
-    for i in 1 : num_batches 
-
-        data = next( io )
-
-        unit_gaussians = ones( latent_vec_size )
-
-        _, _, output = eval_model( encoder, decoder, mean, std, unit_gaussians, data )
-
-        out[:, :, :, :, i] = reshape( output, size(output)[ 1:4 ] )
-
-    end
-    
-    file = reshape( out, ( sample_size * num_batches * batches, 2 ) )
-
-    file = ( file .* 2.0 ) .- 1.0
-
-    wavwrite( file, "output.wav", Fs=22050)
-
-    close( io )
 
 end

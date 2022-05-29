@@ -1,7 +1,6 @@
 include("AutoEncoder.jl")
 include("Model.jl")
 include("Data.jl")
-using CUDA
 
 # Runs a single training iteration with backprop. 
 
@@ -59,9 +58,6 @@ end
 init_audio_model = init_model(create_audio_autoencoder(), "data/models/audio.bson")
 init_video_model = init_model(create_video_autoencoder(), "data/models/video.bson")
 
-reshape_audio =  x -> reshape(x, (size(x)[1], 1, size(x)[2], :) )
-reshape_video =  x -> reshape(x, (size(x)[3], size(x)[2], size(x)[1], :) )
-
 
 
 function train_over_data( model, parameters, opt, iterator, reshape_data )
@@ -82,10 +78,6 @@ function train_autoencoder( model_dir, data_dir, data_itr, reshaper )
 
     model, parameters, opt = load_model( model_dir )
 
-    model = model |> gpu
-
-    model = fmap(Float32, model)
-
     num_files = length(readdir(data_dir))
 
     for (i, dir) in enumerate(readdir(data_dir, join=true))
@@ -94,15 +86,64 @@ function train_autoencoder( model_dir, data_dir, data_itr, reshaper )
 
         train_over_data( model, parameters, opt, data_itr(dir), reshaper )
 
-        save_model(model_dir, model |> cpu, parameters, opt)
+        save_model(model_dir, model .|> cpu, parameters, opt)
 
     end
 
 end
 
 
-function test_audio( model_dir="data/models/audio.bson", output="audio_test.wav" )
+
+function test_audio(; model_dir="data/models/audio.bson", output="audio_test.wav", data_dir="data/audio", model_size=128 )
 
     model, parameters, opt = load_model( model_dir )
+
+    encoder, decoder, mean, std = model
+
+    directory   = readdir( data_dir )[1]
+
+    audio_itr   = AudioIterator( directory )
+
+    _, fs, _, _ = wavread( directory )
+
+    out = map( audio_itr ) do sample
+    
+        return eval_model( encoder, decoder, mean, std, ones(model_size), reshape_audio(sample) )
+
+    end
+
+    out = cat(out..., dims=1)
+
+    out = reshape( out, ( size(out)[1], : ) )
+
+    wavwrite( out, output, Fs=fs )
+
+end
+
+
+
+function test_video(; model_dir="data/models/video.bson", output="video_test.mp4", data_dir="data/video", model_size=128 )
+
+    model, parameters, opt = load_model( model_dir )
+
+    encoder, decoder, mean, std = model
+
+    directory   = readdir( data_dir )[1]
+
+    video_itr   = VideoIterator( directory )
+
+    out = map( video_itr ) do data
+
+        img_out = eval_model( encoder, decoder, mean, std, ones(model_size), data )
+
+        img_out = mapslices( img_out, dims=4 ) do img
+
+            return reshape( img, (size(img)[3], size(img)[2], size(img)[1]) ) |> colorview
+
+        end
+
+    end
+
+    VideoIO.save(output, out)
 
 end
