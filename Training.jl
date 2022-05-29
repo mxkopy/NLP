@@ -2,6 +2,8 @@ include("AutoEncoder.jl")
 include("Model.jl")
 include("Data.jl")
 
+using Printf
+
 # Runs a single training iteration with backprop. 
 
 function train_iter( model, parameters, opt, data::Array{Float32}, model_size=128 )
@@ -88,7 +90,8 @@ function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=5000 )
 
         next_save      = (save_freq - n - i) % save_freq
 
-        println("\rr: $r_loss d: $d_loss r_avg: $r_avg d_avg: $d_avg next_save: $next_save")
+        @printf "\rr %.5e d %.5e r_avg %.5e d_avg %.5e next_save %d" r_loss d_loss r_avg d_avg next_save
+        flush(stdout)
 
         if next_save == 0
         
@@ -98,9 +101,8 @@ function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=5000 )
             serialize( data_dir*"/checkpoint", (n + i, r_avg, d_avg) )
 
         end
-        
-    end
 
+    end
 
 end
 

@@ -72,3 +72,4 @@ if args["test-video"]
     test_autoencoder("data/models/video.bson", "data/video", VideoIterator, save_video, "video_test.mp4" )
 
 end
+
