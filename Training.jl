@@ -100,7 +100,7 @@ function test_audio(; model_dir="data/models/audio.bson", output="audio_test.wav
 
     encoder, decoder, mean, std = model
 
-    directory   = readdir( data_dir )[1]
+    directory   = readdir( data_dir, join=true )[1]
 
     audio_itr   = AudioIterator( directory )
 
@@ -128,7 +128,7 @@ function test_video(; model_dir="data/models/video.bson", output="video_test.mp4
 
     encoder, decoder, mean, std = model
 
-    directory   = readdir( data_dir )[1]
+    directory   = readdir( data_dir, join=true )[1]
 
     video_itr   = VideoIterator( directory )
 
