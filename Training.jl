@@ -78,6 +78,8 @@ function train_autoencoder( model_dir, data_dir, data_itr, reshaper )
 
     model, parameters, opt = load_model( model_dir )
 
+    model                  = model .|> gpu
+
     num_files = length(readdir(data_dir))
 
     for (i, dir) in enumerate(readdir(data_dir, join=true))
@@ -86,7 +88,9 @@ function train_autoencoder( model_dir, data_dir, data_itr, reshaper )
 
         train_over_data( model, parameters, opt, data_itr(dir), reshaper )
 
-        save_model(model_dir, model .|> cpu, parameters, opt)
+        model = model .|> cpu
+
+        save_model(model_dir, model, parameters, opt)
 
     end
 

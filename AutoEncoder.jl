@@ -34,7 +34,7 @@ function create_audio_autoencoder( model_size=128, sample_size=1764 )
     std          = Dense( model_size, model_size, celu )
     mean         = Dense( model_size, model_size, celu )
 
-    return encoder |> gpu, decoder |> gpu, mean |> gpu, std |> gpu
+    return encoder, decoder, mean, std
 
 end    
 
@@ -84,7 +84,7 @@ function create_video_autoencoder( model_size=128, sample_size=640 )
     std          = Dense( model_size, model_size, celu )
     mean         = Dense( model_size, model_size, celu )
 
-    return encoder |> gpu, decoder |> gpu, mean |> gpu, std |> gpu
+    return encoder, decoder, mean, std
 
 end    
 
