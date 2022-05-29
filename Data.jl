@@ -1,15 +1,19 @@
 using FileIO, VideoIO, Images, WAV, CUDA
 
 
-
+# data preprocessing
 reshape_audio =  x -> reshape(x, (size(x)[1], 1, size(x)[2], :) )
 reshape_video =  x -> reshape(x, (size(x)[3], size(x)[2], size(x)[1], :) )
+
+# neural network output processing
+deshape_audio =  x -> reshape(x, ( size(x)[1], :) )
+deshape_video =  x -> reshape(x, ( :, size(x)[2], size(x)[1]) ) |> colorview
 
 
 
 function image_to_array( image )
 
-    return image |> channelview
+    return image |> channelview |> reshape_video
 
 end
 
@@ -50,8 +54,10 @@ function load_audio_iterator( dir, sample_size=44100÷25 )
     curr_file    = replace_runoff( curr_file, sample_size )
     curr_file    = reshape_file( curr_file, sample_size )
 
-    return eachslice(curr_file, dims=3) 
+    return Iterators.map( reshape_audio, eachslice(curr_file, dims=3) )
 
 end
 
 AudioIterator( dir ) = load_audio_iterator( dir )
+
+

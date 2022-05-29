@@ -12,7 +12,7 @@ end
 nomask = Q -> mask_function( size(Q)[1] )
 
 
-# Q & K are assumed to be N x D matrices containing queries & keys
+# Q & K are assumed to be n x D matrices containing queries & keys
 
 function attention( Q, K, V, mask, dims=size(Q)[2] )
 

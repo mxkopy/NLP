@@ -38,12 +38,14 @@ args = arguments()
 if args["init-audio"]
 
     init_model( create_audio_autoencoder(), "data/models/audio.bson" )
+    serialize( "data/audio/checkpoint", (0, 0, 0))
 
 end
 
 if args["init-video"]
 
     init_model( create_video_autoencoder(), "data/models/video.bson" )
+    serialize( "data/video/checkpoint", (0, 0, 0))
 
 end
 
@@ -53,22 +55,20 @@ if args["train-audio"]
 
 end
 
-
 if args["train-video"]
 
     train_autoencoder( "data/models/video.bson", "data/video", VideoIterator, reshape_video )
 
 end
 
+if args["test-audio"]
 
-if args["test-video"]
-
-    test_video()
+    test_autoencoder("data/models/audio.bson", "data/audio", AudioIterator, save_audio, "audio_test.mp4" )
 
 end
 
-if args["test-audio"]
+if args["test-video"]
 
-    test_audio()
+    test_autoencoder("data/models/video.bson", "data/video", VideoIterator, save_video, "video_test.mp4" )
 
 end

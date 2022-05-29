@@ -46,6 +46,7 @@ function load_model( savename )
 end
 
 
+
 function init_model( model, savename )
 
     opt = ADAM( 0.01 )
@@ -55,103 +56,107 @@ function init_model( model, savename )
 
 end
 
-init_audio_model = init_model(create_audio_autoencoder(), "data/models/audio.bson")
-init_video_model = init_model(create_video_autoencoder(), "data/models/video.bson")
 
 
+function file_iterator( data_itr )
 
-function train_over_data( model, parameters, opt, iterator, reshape_data )
+    return Iterators.map( data_itr ) do x
 
-    r_avg, d_avg = 0, 0
-
-    update_avg   = (avg, x, n) -> ( ( avg * n ) + x ) / (n + 1)
-
-    for (n, x) in enumerate( iterator )
-
-        data           = reshape_data( x ) .|> Float32 |> gpu
-
-        r_loss, d_loss = train_iter( model, parameters, opt, data )
-
-        r_avg,  d_avg  = update_avg(r_avg, r_loss, n), update_avg(d_avg, d_loss, n)
-
-        println('\r', "r     $r_loss | d     $d_loss", '\n', "r_avg $r_avg | d_avg $d_avg")
+        return Float32.(x)
 
     end
 
 end
 
+# we have descended into madness
+function directory_iterator( data_dir, data_iterator )
 
+    return Iterators.map( filter( x -> !occursin("checkpoint", x), readdir(data_dir, join=true) ) ) do directory
 
-function train_autoencoder( model_dir, data_dir, data_itr, reshaper )
+        return file_iterator( data_iterator( directory ) )
 
-    model, parameters, opt = load_model( model_dir )
-
-    num_files = length(readdir(data_dir))
-
-    for (i, dir) in enumerate(readdir(data_dir, join=true))
-
-        println("$i of $num_files")
-
-        train_over_data( model .|> gpu, parameters, opt, data_itr(dir), reshaper )
-
-        save_model(model_dir, model .|> cpu, parameters, opt)
-
-    end
+    end |> Iterators.flatten
 
 end
 
 
 
-function test_audio(; model_dir="data/models/audio.bson", output="audio_test.wav", data_dir="data/audio", model_size=128 )
 
-    model, parameters, opt = load_model( model_dir )
+function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=10000 )
 
-    encoder, decoder, mean, std = model
+    model, parameters, opt   = deserialize( model_dir )
 
-    directory   = readdir( data_dir, join=true )[1]
+    n, r_avg, d_avg          = deserialize( data_dir * "/checkpoint" )
 
-    audio_itr   = AudioIterator( directory )
+    directory_itr            = Iterators.drop( directory_iterator( data_dir, data_iterator ), n )
 
-    _, fs, _, _ = wavread( directory )
+    model                    = model |> gpu
 
-    out = map( audio_itr ) do sample
-    
-        return eval_model( encoder, decoder, mean, std, ones(model_size), reshape_audio(sample) )
+    for (i, data) in enumerate( directory_itr )
 
-    end
+        r_loss, d_loss = train_iter( model, parameters, opt, data |> gpu )
 
-    out = cat(out..., dims=1)
+        r_avg, d_avg   = (r_avg + r_loss) / (n + i), (d_avg + d_loss) / (n + i)
 
-    out = reshape( out, ( size(out)[1], : ) )
+        println('\r', "r: $r_loss d: $d_loss r_avg: $r_avg d_avg: $d_avg itr# $((n+i) % save_freq)")
 
-    wavwrite( out, output, Fs=fs )
-
-end
-
-
-
-function test_video(; model_dir="data/models/video.bson", output="video_test.mp4", data_dir="data/video", model_size=128 )
-
-    model, parameters, opt = load_model( model_dir )
-
-    encoder, decoder, mean, std = model
-
-    directory   = readdir( data_dir, join=true )[1]
-
-    video_itr   = VideoIterator( directory )
-
-    out = map( video_itr ) do data
-
-        img_out = eval_model( encoder, decoder, mean, std, ones(model_size), data )
-
-        img_out = mapslices( img_out, dims=4 ) do img
-
-            return reshape( img, (size(img)[3], size(img)[2], size(img)[1]) ) |> colorview
+        if i % save_freq == 0
+        
+            println("model saved!")
+            
+            serialize( model_dir, (model |> cpu, parameters, opt) )
+            serialize( data_dir*"/checkpoint", (n + i, r_avg, d_avg) )
 
         end
+        
+    end
+
+
+end
+
+
+
+function save_audio( data, output )
+
+    file = cat( data..., dims=1 )
+
+    file = reshape(file, (size(file)[1], :))
+
+    wavwrite(file, output, Fs=44100)
+
+end
+
+
+
+function save_video( data, output )
+
+    file = map( data ) do img
+
+        return reshape( img, (size(img)[3], size(img)[2], size(img)[1]) ) |> colorview
 
     end
 
-    VideoIO.save(output, out)
+    VideoIO.save(output, file)
 
 end
+
+
+
+function test_autoencoder( model_dir, data_dir, data_iterator, save_function, output, model_size=128, num_iter=10000 )
+
+    (encoder, decoder, mean, std), _, _ = load_model( model_dir )
+
+    encoder  = encoder[1:end-1]
+
+    data_itr = Iterators.take( directory_iterator( data_dir, data_iterator ), num_iter )
+
+    out = map( data_itr ) do data 
+
+        return eval_model( encoder, decoder, mean, std, ones(model_size), data )
+
+    end
+
+    save_function(out, output)
+
+end
+
