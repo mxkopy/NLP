@@ -1,7 +1,7 @@
 include("AutoEncoder.jl")
 include("Model.jl")
 include("Data.jl")
-
+using CUDA
 
 # Runs a single training iteration with backprop. 
 
@@ -9,7 +9,7 @@ function train_iter( model, parameters, opt, data, model_size=128 )
 
     # Generates an array of random floats. These are used for the reparameterization trick
 
-    unit_gaussians = rand( Normal( 1.0, 0.1 ), model_size )
+    unit_gaussians = rand( Normal( 1.0, 0.1 ), model_size ) |> gpu
 
     r_loss, d_loss = 0, 0
 
@@ -68,7 +68,7 @@ function train_over_data( model, parameters, opt, iterator, reshape_data )
 
     for x in iterator
 
-        data = reshape_data( x )
+        data = reshape_data( Float32.( x ) )
 
         train_iter( model, parameters, opt, data )
 
@@ -78,39 +78,29 @@ end
 
 
 
-function train_audio()
+function train_autoencoder( model_dir, data_dir, data_itr, reshaper )
 
-    model, parameters, opt = load_model("data/models/audio.bson")
+    model, parameters, opt = load_model( model_dir )
 
-    num_files = length(readdir("data/audio"))
+    model = model |> gpu
 
-    for (i, dir) in enumerate(readdir("data/audio", join=true))
+    num_files = length(readdir(data_dir))
+
+    for (i, dir) in enumerate(readdir(data_dir, join=true))
 
         println("$i of $num_files")
 
-        train_over_data( model, parameters, opt, AudioIterator(dir), reshape_audio )
+        train_over_data( model, parameters, opt, data_itr(dir), reshaper )
 
-        save_model("data/models/audio.bson", model, parameters, opt)
+        save_model(model_dir, model |> cpu, parameters, opt)
 
     end
 
 end
 
 
-function train_video()
+function test_audio( model_dir="data/models/audio.bson", output="audio_test.wav" )
 
-    model, parameters, opt = load_model("data/models/video.bson")
-
-    num_files = length(readdir("data/video"))
-
-    for (i, dir) in enumerate(readdir("data/video", join=true))
-
-        println("$i of $num_files")
-
-        train_over_data( model, parameters, opt, VideoIterator(dir), reshape_video )
-
-        save_model("data/models/video.bson", model, parameters, opt)
-
-    end
+    model, parameters, opt = load_model( model_dir )
 
 end

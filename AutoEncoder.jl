@@ -13,6 +13,9 @@ function create_audio_autoencoder( model_size=128, sample_size=1764 )
     encoder = Chain(
     
         Dense(sample_size, model_size, bias=false),
+
+        Conv( (1, 1), 2 => 16, stride=1),
+
         Dense(model_size, model_size, celu),
     
         Dropout(0.5)
@@ -20,7 +23,10 @@ function create_audio_autoencoder( model_size=128, sample_size=1764 )
     
     decoder = Chain(
 
-        # Dense(model_size, model_size, celu),
+        Dense(model_size, model_size, celu),
+
+        Conv( (1, 1), 16 => 2, stride=1),
+
         Dense(model_size, sample_size, bias=false)
             
     )
@@ -35,19 +41,22 @@ end
 
 function create_video_autoencoder( model_size=128, sample_size=640 )
 
-    encoder_shape::Integer = ceil(sqrt(model_size))
+    encoder_shape::Integer = floor(sqrt(model_size))
 
     encoder = Chain(
     
-        Conv( (3, 3), (3 => 4),  pad=2, stride=1), 
-        Conv( (3, 3), (4 => 8),  pad=2, stride=2), 
-        Conv( (3, 3), (8 => 16), pad=2, stride=2),
+        Conv( (1, 1), 3 => 6,   pad=2, stride=1),
 
+        Conv( (3, 3), 6 => 8,   pad=2, stride=2), 
+        Conv( (3, 3), 8 => 8,   pad=2, stride=2),
+        Conv( (3, 3), 8 => 8,   pad=2, stride=2),
+        Conv( (3, 3), 8 => 16,  pad=2, stride=2),
+        Conv( (3, 3), 16 => 16, pad=2, stride=2),
+        Conv( (3, 3), 16 => 16, pad=2, stride=2),
 
+        x -> reshape(x, ( size(x)[1] * size(x)[2], 1, size(x)[3], : ) ),
 
-        AdaptiveMeanPool( ( encoder_shape, encoder_shape ) ),
-
-        x -> reshape(x, ( encoder_shape * encoder_shape, 1, size(x)[3], : ) ),
+        AdaptiveMeanPool( ( model_size, 1 ) ),
 
         Dropout( 0.5 )
 
@@ -55,27 +64,27 @@ function create_video_autoencoder( model_size=128, sample_size=640 )
     
     decoder = Chain(
 
-        AdaptiveMeanPool( ( (encoder_shape - 1) * (encoder_shape - 1), 1) ),
+        AdaptiveMeanPool( (encoder_shape * encoder_shape, 1) ),
 
-        x -> reshape(x, ((encoder_shape - 1), (encoder_shape - 1), size(x)[3], :) ),
+        x -> reshape(x, (encoder_shape, encoder_shape, size(x)[3], :) ),
 
+        ConvTranspose( (3, 3), 16 => 16, stride=2 ),
+        ConvTranspose( (3, 3), 16 => 16, stride=2 ),
+        ConvTranspose( (3, 3), 16 => 8,  stride=2 ),
+        ConvTranspose( (3, 3), 8 => 8,   stride=2 ),
+        ConvTranspose( (3, 3), 8 => 8,   stride=2 ),
+        ConvTranspose( (3, 3), 8 => 6,   stride=2 ),
 
+        ConvTranspose( (1, 1), 6 => 3,   stride=1 ),
 
-        ConvTranspose( (3, 3), 16 => 8, stride=2 ),
-        Upsample( scale=(2, 2) ), 
+        AdaptiveMeanPool( (sample_size, sample_size) )
 
-        ConvTranspose( (3, 3), 8 => 4,  stride=2 ),
-        Upsample( scale=(2, 2) ),
-
-        ConvTranspose( (3, 3), 4 => 3,  stride=2 ),
-        Upsample( scale=(2, 2) ), 
-        
-        x -> x[1:sample_size, 1:sample_size, :, :]
+        # x -> x[1:sample_size, 1:sample_size, :, :]
     
     )
     
-    std          = Dense( encoder_shape * encoder_shape, model_size, celu )
-    mean         = Dense( encoder_shape * encoder_shape, model_size, celu )
+    std          = Dense( model_size, model_size, celu )
+    mean         = Dense( model_size, model_size, celu )
 
     return encoder, decoder, mean, std
 

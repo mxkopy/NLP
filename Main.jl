@@ -11,14 +11,14 @@ function arguments()
         "--init-audio"
             action = :store_true
 
-	"--init-video"
-	    action = :store_true
+	    "--init-video"
+	        action = :store_true
 
         "--train-audio"
             action = :store_true
 	
-	"--train-video"
-	    action = :store_true
+	    "--train-video"
+	        action = :store_true
 
     end
 
@@ -42,13 +42,13 @@ end
 
 if args["train-audio"]
 
-    train_audio()
+    train_autoencoder( "data/models/audio.bson", "data/audio", AudioIterator, reshape_audio )
 
 end
 
 
 if args["train-video"]
 
-    train_video()
+    train_autoencoder( "data/models/video.bson", "data/video", VideoIterator, reshape_video )
 
 end
