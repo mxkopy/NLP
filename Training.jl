@@ -20,9 +20,9 @@ function train_iter( model, parameters, opt, data, model_size=128 )
 
     end
 
-    println('\n', "r ", string(r_loss), " | d ", string(d_loss) )
-
     Flux.Optimise.update!( opt, parameters, gs )
+
+    return r_loss, d_loss
 
 end
 
@@ -62,11 +62,19 @@ init_video_model = init_model(create_video_autoencoder(), "data/models/video.bso
 
 function train_over_data( model, parameters, opt, iterator, reshape_data )
 
-    for x in iterator
+    r_avg, d_avg = 0, 0
 
-        data = reshape_data( x ) .|> Float32 |> gpu
+    update_avg   = (avg, x, n) -> ( ( avg * n ) + x ) / (n + 1)
 
-        train_iter( model, parameters, opt, data )
+    for (n, x) in enumerator( iterator )
+
+        data           = reshape_data( x ) .|> Float32 |> gpu
+
+        r_loss, d_loss = train_iter( model, parameters, opt, data )
+
+        r_avg,  d_avg  = update_avg(r_avg, r_loss, n), update_avg(d_avg, d_loss, n)
+
+        println('\r', "r     $r_loss | d     $d_loss", '\n', "r_avg $r_avg | d_avg $d_avg")
 
     end
 
@@ -82,15 +90,11 @@ function train_autoencoder( model_dir, data_dir, data_itr, reshaper )
 
     for (i, dir) in enumerate(readdir(data_dir, join=true))
 
-        model = model .|> gpu
-
         println("$i of $num_files")
 
-        train_over_data( model, parameters, opt, data_itr(dir), reshaper )
+        train_over_data( model .|> gpu, parameters, opt, data_itr(dir), reshaper )
 
-        cpu_model = model .|> cpu
-
-        save_model(model_dir, cpu_model, parameters, opt)
+        save_model(model_dir, model .|> cpu, parameters, opt)
 
     end
 
