@@ -1,17 +1,22 @@
 using Flux, SliceMap
+# https://arxiv.org/abs/1706.03762
 
 
-function mask( length, exclude=[] )
+
+function mask_function( length, exclude=[] )
 
     return collect( i in exclude ? 0 : 1 for i in 1:length )
 
 end
 
+nomask = Q -> mask_function( size(Q)[1] )
 
 
-function attention( Q, K, V, mask )
+# Q & K are assumed to be N x D matrices containing queries & keys
 
-    compatability = ( Q * transpose( K ) ./ sqrt( size(Q)[2] ) ) .* mask |> softmax
+function attention( Q, K, V, mask, dims=size(Q)[2] )
+
+    compatability = ( Q * transpose( K ) ./ sqrt( dims ) ) .* mask |> softmax
 
     return compatability * V
 
@@ -26,14 +31,14 @@ function head( Q, K, V, qw, kw, vw, mask )
 end
 
 
-# m, in this case, is a function that takes in the current position of the word being attended to 
+# mask, in this case, is a function that takes in the current position of the word being attended to 
 # so for regular multihead attention we just set it to a default-mask (i.e. all ones)
-# for masked multiheaded attention we can define m to be the mask of everything but the current position
-function multihead_attention( Q, K, V, QW, KW, VW, WO, m=_ -> mask( size(Q)[1] ) )
+# for masked multiheaded attention we can define mask to be the mask of everything but the current position
+function multihead_attention( Q, K, V, QW, KW, VW, WO, mask=nomask )
 
     out = map( 1:length(QW) ) do i
 
-        return head( Q, K, V, QW[i], KW[i], VW[i], m(i) )
+        return head( Q, K, V, QW[i], KW[i], VW[i], mask(Q) )
 
     end
 
@@ -58,14 +63,14 @@ end
 
 
 
-function multihead_layer( d_m, d_k, d_v, h, m=Q -> _ -> mask( size(Q)[1] ) )
+function multihead_layer( d_m, d_k, d_v, h, mask )
 
     QW = [ rand(d_m, d_k) for _ in 1:h ]
     KW = [ rand(d_m, d_k) for _ in 1:h ]
     VW = [ rand(d_m, d_v) for _ in 1:h ]
     WO = rand( h * d_v, d_m )
 
-    attend = (Q, K, V) -> multihead_attention( Q, K, V, QW, KW, VW, WO, m(Q) )
+    attend = (Q, K, V) -> multihead_attention( Q, K, V, QW, KW, VW, WO, mask(Q) )
 
     layer  = (Q, K, V) -> normalize( attend( Q, K, V ) + Q )
 
@@ -89,9 +94,9 @@ end
 
 
 
-function create_encoder( d_m=300, d_k=50, d_v=50, h=8 )
+function create_encoder( d_m, d_k, d_v, h )
 
-    multihead, params = multihead_layer(d_m, d_k, d_v, h)
+    multihead, params = multihead_layer(d_m, d_k, d_v, h, nomask )
 
     ffn, dense        = FFN_layer( d_m )
 
@@ -101,13 +106,11 @@ end
 
 
 
-function create_decoder( d_m=300, d_k=50, d_v=50, h=8 )
+function create_decoder( d_m, d_k, d_v, h, mask )
     
-    m = Q -> i -> mask( size(Q)[1], collect( i:size(Q)[1] ) )
+    masked_multihead, params_1 = multihead_layer( d_m, d_k, d_v, h, mask )
 
-    masked_multihead, params_1 = multihead_layer( d_m, d_k, d_v, h, m )
-
-    multihead, params_2        = multihead_layer( d_m, d_k, d_v, h )
+    multihead, params_2        = multihead_layer( d_m, d_k, d_v, h, nomask )
 
     ffn, dense                 = FFN_layer( d_m )
 
@@ -128,10 +131,10 @@ function layer_forward( encoder, decoder, input, output )
 
 end
 
-function create_layer( d_m=300, d_k=50, d_v=50, h=8 )
+function create_layer( d_m, d_k, d_v, h, mask )
 
     encoder, enc_params = create_encoder( d_m, d_k, d_v, h )
-    decoder, dec_params = create_decoder( d_m, d_k, d_v, h )
+    decoder, dec_params = create_decoder( d_m, d_k, d_v, h, mask )
 
     layer = (input, output) -> layer_forward( encoder, decoder, input, output )
 
@@ -140,9 +143,9 @@ function create_layer( d_m=300, d_k=50, d_v=50, h=8 )
 end
 
 
-function create_stack( d_m=300, d_k=50, d_v=50, h=8, depth=6 )
+function create_stack( d_m=300, d_k=50, d_v=50, h=8, depth=6, mask=Q -> i -> mask( size(Q)[1], collect( i:size(Q)[1] ) ) )
 
-    layers_params = [ create_layer(d_m, d_k, d_v, h) for _ in 1:depth ]
+    layers_params = [ create_layer(d_m, d_k, d_v, h, mask) for _ in 1:depth ]
 
     layers = [ layer for (layer, _) in layers_params ]
     params = [ param for (_, param) in layers_params ]
