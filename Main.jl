@@ -51,13 +51,13 @@ end
 
 if args["train-audio"]
 
-    train_autoencoder( "data/models/audio.bson", "data/audio", AudioIterator, reshape_audio )
+    train_autoencoder( "data/models/audio.bson", "data/audio", AudioIterator )
 
 end
 
 if args["train-video"]
 
-    train_autoencoder( "data/models/video.bson", "data/video", VideoIterator, reshape_video )
+    train_autoencoder( "data/models/video.bson", "data/video", VideoIterator )
 
 end
 
