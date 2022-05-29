@@ -66,7 +66,7 @@ function train_over_data( model, parameters, opt, iterator, reshape_data )
 
     update_avg   = (avg, x, n) -> ( ( avg * n ) + x ) / (n + 1)
 
-    for (n, x) in enumerator( iterator )
+    for (n, x) in enumerate( iterator )
 
         data           = reshape_data( x ) .|> Float32 |> gpu
 
