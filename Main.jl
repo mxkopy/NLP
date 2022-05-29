@@ -20,6 +20,13 @@ function arguments()
 	    "--train-video"
 	        action = :store_true
 
+        "--test-video"
+	        action = :store_true
+
+        "--test-audio"
+	        action = :store_true
+
+
     end
 
     return parse_args( s )
@@ -50,5 +57,18 @@ end
 if args["train-video"]
 
     train_autoencoder( "data/models/video.bson", "data/video", VideoIterator, reshape_video )
+
+end
+
+
+if args["test-video"]
+
+    test_video()
+
+end
+
+if args["test-audio"]
+
+    test_audio()
 
 end
