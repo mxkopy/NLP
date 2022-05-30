@@ -1,4 +1,5 @@
 include("Model.jl")
+include("InceptionVAE.jl")
 
 using Flux, Serialization, WAV, Zygote, Distributions, CUDA
  
@@ -31,60 +32,24 @@ function create_audio_autoencoder( model_size=128, sample_size=1764 )
             
     )
     
-    std          = Dense( model_size, model_size, celu )
     mean         = Dense( model_size, model_size, celu )
+    std          = Dense( model_size, model_size, celu )
 
-    return encoder, decoder, mean, std
+    return (encoder, decoder, mean, std), Flux.params( encoder, decoder, mean, std )
 
 end    
 
 
 function create_video_autoencoder( model_size=128, sample_size=640 )
 
-    encoder_shape::Integer = floor(sqrt(model_size))
+    encoder, enc_params  = inception_encoder( model_size )
+    decoder, dec_params  = inception_decoder( sample_size)
 
-    encoder = Chain(
-    
-        Conv( (1, 1), 3 => 6,         pad=2, stride=1),
+    mean                 = Dense( model_size, model_size, celu )
+    std                  = Dense( model_size, model_size, celu )
 
-        Conv( (3, 3), 6 => 8,         pad=2, stride=2), 
-        Conv( (3, 3), 8 => 8, relu,   pad=2, stride=2),
-        Conv( (3, 3), 8 => 8,         pad=2, stride=2),
-        Conv( (3, 3), 8 => 16,        pad=2, stride=2),
-        Conv( (3, 3), 16 => 16, relu, pad=2, stride=2),
-        Conv( (3, 3), 16 => 16,       pad=2, stride=2),
 
-        x -> reshape(x, ( size(x)[1] * size(x)[2], 1, size(x)[3], : ) ),
-
-        AdaptiveMeanPool( ( model_size, 1 ) ),
-
-        Dropout( 0.5 )
-
-    )
-    
-    decoder = Chain(
-
-        AdaptiveMeanPool( (encoder_shape * encoder_shape, 1) ),
-
-        x -> reshape(x, (encoder_shape, encoder_shape, size(x)[3], :) ),
-
-        ConvTranspose( (3, 3), 16 => 16,       stride=2 ),
-        ConvTranspose( (3, 3), 16 => 16, relu, stride=2 ),
-        ConvTranspose( (3, 3), 16 => 8,        stride=2 ),
-        ConvTranspose( (3, 3), 8 => 8,         stride=2 ),
-        ConvTranspose( (3, 3), 8 => 8,         stride=2 ),
-        ConvTranspose( (3, 3), 8 => 6, relu,   stride=2 ),
-
-        ConvTranspose( (1, 1), 6 => 3,   stride=1 ),
-
-        AdaptiveMeanPool( (sample_size, sample_size) )
-    
-    )
-    
-    std          = Dense( model_size, model_size, celu )
-    mean         = Dense( model_size, model_size, celu )
-
-    return encoder, decoder, mean, std
+    return (encoder, decoder, mean, std), Flux.params( enc_params..., dec_params..., mean, std)
 
 end    
 
