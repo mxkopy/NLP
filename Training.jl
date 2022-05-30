@@ -49,12 +49,13 @@ end
 
 
 
-function init_model( model, savename )
+function init_model( savename, model_and_params )
 
     opt = ADAM( 0.01 )
-    parameters = Flux.params( model... )
 
-    save_model( savename, model, parameters, opt )
+    model, ps = model_and_params
+
+    save_model( savename, model, Flux.params(ps...), opt )
 
 end
 
