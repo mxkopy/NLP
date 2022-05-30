@@ -37,14 +37,14 @@ args = arguments()
 
 if args["init-audio"]
 
-    init_model( create_audio_autoencoder(), "data/models/audio.bson" )
+    init_model( "data/models/audio.bson", create_audio_autoencoder() )
     serialize( "data/audio/checkpoint", (0, 0, 0))
 
 end
 
 if args["init-video"]
 
-    init_model( create_video_autoencoder(), "data/models/video.bson" )
+    init_model( "data/models/video.bson", create_video_autoencoder() )
     serialize( "data/video/checkpoint", (0, 0, 0))
 
 end
