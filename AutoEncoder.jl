@@ -35,21 +35,20 @@ function create_audio_autoencoder( model_size=128, sample_size=1764 )
     mean         = Dense( model_size, model_size, celu )
     std          = Dense( model_size, model_size, celu )
 
-    return (encoder, decoder, mean, std), Flux.params( encoder, decoder, mean, std )
+    return encoder, decoder, mean, std 
 
 end    
 
 
 function create_video_autoencoder( model_size=128, sample_size=640 )
 
-    encoder, enc_params  = inception_encoder( model_size )
-    decoder, dec_params  = inception_decoder( sample_size)
+    encoder  = inception_encoder( model_size )
+    decoder  = inception_decoder( sample_size)
 
-    mean                 = Dense( model_size, model_size, celu )
-    std                  = Dense( model_size, model_size, celu )
+    mean     = Dense( model_size, model_size, celu )
+    std      = Dense( model_size, model_size, celu )
 
-
-    return (encoder, decoder, mean, std), Flux.params( enc_params..., dec_params..., mean, std)
+    return encoder, decoder, mean, std 
 
 end    
 

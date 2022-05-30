@@ -6,7 +6,7 @@ using Printf
 
 # Runs a single training iteration with backprop. 
 
-function train_iter( model, parameters, opt, data::Array{Float32}, model_size=128 )
+function train_iter( model, parameters, opt, data, model_size=128 )
 
     # Generates an array of random floats. These are used for the reparameterization trick
 
@@ -49,13 +49,11 @@ end
 
 
 
-function init_model( savename, model_and_params )
+function init_model( savename, model )
 
     opt = ADAM( 0.01 )
 
-    model, ps = model_and_params
-
-    save_model( savename, model, Flux.params(ps...), opt )
+    save_model( savename, model, Flux.params(model...), opt )
 
 end
 
@@ -85,7 +83,7 @@ function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=5000 )
 
     for (i, data) in enumerate( directory_itr )
 
-        r_loss, d_loss = train_iter( model |> gpu, parameters, opt, data |> gpu )
+        r_loss, d_loss = train_iter( model .|> gpu, parameters, opt, data |> gpu )
 
         r_avg, d_avg   = (r_avg + r_loss) / (n + i), (d_avg + d_loss) / (n + i)
 
@@ -98,7 +96,7 @@ function train_autoencoder( model_dir, data_dir, data_iterator, save_freq=5000 )
         
             println("model saved!")
             
-            serialize( model_dir, (model |> cpu, parameters, opt) )
+            serialize( model_dir, (model .|> cpu, parameters, opt) )
             serialize( data_dir*"/checkpoint", (n + i, r_avg, d_avg) )
 
         end
