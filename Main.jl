@@ -76,33 +76,37 @@ program_args = arguments()
 
 if program_args["init-audio"]
 
-    AudioTrainer( model_size=program_args["model-size"], audio_size=program_args["audio-size"], data_dir=program_args["audio-data"], batches=program_args["batches"] )
+    AudioTrainer( model_size=program_args["model-size"], audio_size=program_args["audio-size"], filename=program_args["audio-model-filename"] )
 
 end
 
 if program_args["init-video"]
 
-    VideoTrainer( model_size=program_args["model-size"], image_size=program_args["image-size"], data_dir=program_args["video-data"], batches=program_args["batches"] )
+    VideoTrainer( model_size=program_args["model-size"], image_size=program_args["image-size"], filename=program_args["video-model-filename"] )
 
 end
 
 if program_args["train-audio"]
 
-    filname = program_args["audio-data"] * "/audio.bson" 
+    trainer  = deserialize( program_args["audio-model-filename"] )
 
-    trainer = deserialize( filename )
+    iterator = Iterators.drop( AudioIterator( program_args["audio-data"],program_args["audio-size"], batches=program_args["batches"] ), trainer.checkpoint )
 
-    train_loop(trainer, filename, save_freq=program_args["save-freq"])
+    to_device(trainer.model, trainer.device)
+
+    train_loop(trainer, iterator, filename, save_freq=program_args["save-freq"])
 
 end
 
 if program_args["train-video"]
 
-    filname = program_args["video-data"] * "/video.bson" 
+    trainer  = deserialize( program_args["video-model-filename"] )
 
-    trainer = deserialize( filename )
+    iterator = Iterators.drop( VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"] ), trainer.checkpoint )
 
-    train_loop(trainer, filename, save_freq=program_args["save-freq"])
+    to_device(trainer.model, trainer.device)
+
+    train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])
 
 end
 

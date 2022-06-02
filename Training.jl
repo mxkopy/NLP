@@ -39,8 +39,9 @@ mutable struct Trainer
     model::AutoEncoder
     optimizer
     parameters
-    iterator::BatchIterator
+    model_size
     device
+    checkpoint
 
 end
 
@@ -53,11 +54,11 @@ function save( savename, trainer::Trainer )
 end
 
 
-function train_iteration( trainer::Trainer )
+function train_iteration( trainer::Trainer, data )
 
-    data           = Iterators.take( trainer.iterator, 1 ) .|> Float32 |> trainer.device
+    data           = data .|> Float32 |> trainer.device
 
-    param          = rand( Normal( 1.0, 0.1 ), trainer.args["model-size"] ) .|> Float32 |> trainer.device
+    param          = rand( Normal( 1.0, 0.1 ), trainer.model_size ) .|> Float32 |> trainer.device
 
     r_loss, d_loss = backprop_iteration( trainer.model, trainer.optimizer, trainer.parameters, param, data )
 
@@ -65,47 +66,32 @@ function train_iteration( trainer::Trainer )
 
 end
 
-function Base.iterate( trainer::Trainer, state )
-
-    isempty(trainer.iterator.itr) ? nothing : (train_iteration( trainer ), trainer.iterator.itr )
-
-end
-
-function Base.iterate( trainer::Trainer )
-
-    to_device( trainer.model, trainer.device )
-
-    return (0, 0), trainer.iterator.itr
-
-end
 
 
-function AudioTrainer(; model_size=128, audio_size=1764, data_dir="data/audio", batches=4, optimizer=ADAM(0.01), device=gpu )
+function AudioTrainer(; model_size=128, audio_size=1764, filename="data/models/audio", optimizer=ADAM(0.01), device=gpu )
     
     model   = create_audio_autoencoder( model_size, audio_size )
-    itr     = AudioIterator( data_dir, audio_size, batches=batches )
+    trainer = Trainer( model, optimizer, Flux.params( model.encoder, model.decoder, model.mean, model.std), model_size, device, 0 )
 
-    trainer = Trainer( model, optimizer, Flux.params( model.encoder, model.decoder, model.mean, model.std), itr, device )
-
-    serialize( data_dir * "/audio.bson", trainer )
+    serialize( filename, trainer )
 
 end
 
-function VideoTrainer(; model_size=128, image_size=640, data_dir="data/video", batches=4, optimizer=ADAM(0.01), device=gpu )
+function VideoTrainer(; model_size=128, image_size=640, filename="data/models/video.bson", optimizer=ADAM(0.01), device=gpu )
     
     model   = create_video_autoencoder( model_size, image_size )
-    itr     = VideoIterator( data_dir, image_size, batches=batches )
+    trainer = Trainer( model, optimizer, Flux.params( model.encoder, model.decoder, model.mean, model.std), model_size, device, 0 )
 
-    trainer = Trainer( model, optimizer, Flux.params( model.encoder, model.decoder, model.mean, model.std), itr, device )
-
-    serialize( data_dir * "/video.bson", trainer )
+    serialize( filename, trainer )
 
 end
 
 
-function train_loop( trainer::Trainer, savename; save_freq=1000 )
+function train_loop( trainer::Trainer, iterator, savename; save_freq=1000 )
 
-    for (i, (r_loss, d_loss)) in enumerate( trainer )
+    for (i, data) in enumerate( iterator )
+
+        r_loss, d_loss = train_iteration( trainer, data )
 
         next_save = save_freq - ( i % save_freq ) - 1 
 
@@ -113,6 +99,8 @@ function train_loop( trainer::Trainer, savename; save_freq=1000 )
         flush(stdout)
 
         if next_save == 0
+
+            trainer.checkpoint += save_freq
 
             save(savename, trainer)
 
