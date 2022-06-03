@@ -2,13 +2,13 @@ module AudioVAE
 
 using Flux, FFTW, SliceMap
 
+struct DenseFFT
 
-struct DenseFFT{T} where T <: Union{ComplexF16, ComplexF32, ComplexF64}
-
-    W::Array{T}
-    b::Array{T}
+    W::AbstractArray{<:Complex}
+    b::AbstractArray{<:Complex}
 
 end
+
 
 
 function dense_fft( layer::DenseFFT, data::AbstractArray{<: Real, 1} )
@@ -22,6 +22,7 @@ function dense_fft( layer::DenseFFT, data::AbstractArray{<: Real, 1} )
 end
 
 
+
 function (layer::DenseFFT)(data::Array{<: Real})
 
     return slicemap( x -> dense_fft( layer, x ), data, dims=1 )
@@ -29,9 +30,10 @@ function (layer::DenseFFT)(data::Array{<: Real})
 end
 
 
+
 init_complex_array( shape, init_real=Flux.glorot_normal, init_imag=init_real ) = Complex.( init_real( reduce(*, shape) ), init_imag( reduce(*, shape) ) ) |> x -> reshape( x, shape )
 
-DenseFFT( dim_in::Int, dim_out::Int; init=Flux.glorot_normal ) = DenseFFT{ComplexF32}( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
+DenseFFT( dim_in::Int, dim_out::Int; init=Flux.glorot_normal ) = DenseFFT( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
 
 Flux.@functor DenseFFT
 
