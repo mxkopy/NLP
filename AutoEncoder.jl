@@ -81,26 +81,3 @@ function create_video_autoencoder( model_size=128, image_size=640 )
 
 end
 
-
-
-function init_audio_autoencoder( savename, model_size, audio_size )
-
-    opt = ADAM( 0.01 )
-
-    model = create_audio_autoencoder( model_size, audio_size )
-
-    serialize( savename, (model, opt, Flux.params(model.encoder, model.decoder, model.mean, model.std, model.dropout), args) )
-
-end
-
-
-
-function init_video_autoencoder( savename, args )
-
-    opt = ADAM( 0.01 )
-
-    model = create_video_autoencoder( args["model-size"], args["image-size"] )
-
-    serialize( savename, (model, opt, Flux.params(model.encoder, model.decoder, model.mean, model.std, model.dropout), args) )
-
-end
