@@ -3,10 +3,10 @@ module AudioVAE
 using Flux, FFTW, SliceMap
 
 
-struct DenseFFT
+struct DenseFFT{T} where T <: Union{ComplexF16, ComplexF32, ComplexF64}
 
-    W::Array{<:Complex}
-    b::Array{<:Complex}
+    W::Array{T}
+    b::Array{T}
 
 end
 
@@ -31,11 +31,9 @@ end
 
 init_complex_array( shape, init_real=Flux.glorot_normal, init_imag=init_real ) = Complex.( init_real( reduce(*, shape) ), init_imag( reduce(*, shape) ) ) |> x -> reshape( x, shape )
 
-DenseFFT( dim_in::Int, dim_out::Int; init=Flux.glorot_normal ) = DenseFFT( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
+DenseFFT( dim_in::Int, dim_out::Int; init=Flux.glorot_normal ) = DenseFFT{ComplexF32}( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
 
 Flux.@functor DenseFFT
-
-gpu( x::DenseFFT ) = DenseFFT( x.W |> gpu, x.b |> gpu )
 
 
 function coder_conv( in_channels, out_channels, kernel, conv_type )
