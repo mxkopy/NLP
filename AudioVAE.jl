@@ -1,3 +1,5 @@
+module AudioVAE
+
 using Flux, FFTW, SliceMap
 
 
@@ -9,7 +11,7 @@ struct DenseFFT
 end
 
 
-function dense_ifft( layer::DenseFFT, data::AbstractArray{<: Real, 1} )
+function dense_fft( layer::DenseFFT, data::AbstractArray{<: Real, 1} )
 
     x   = FFTW.fft( data )
     frq = ( transpose( layer.W ) * x ) .+ layer.b
@@ -20,47 +22,68 @@ function dense_ifft( layer::DenseFFT, data::AbstractArray{<: Real, 1} )
 end
 
 
-function (layer::DenseFFT)(data::Array{<: Real} )
+function (layer::DenseFFT)(data::Array{<: Real})
 
-    return slicemap( x -> dense_ifft( layer, x ), data, dims=1 )
+    return slicemap( x -> dense_fft( layer, x ), data, dims=1 )
 
 end
 
 
-init_complex_array( shape, init ) = Complex.( init( reduce(*, shape) ), init( reduce(*, shape) ) ) |> x -> reshape( x, shape )
-
+init_complex_array( shape, init_real=Flux.glorot_normal, init_imag=init_real ) = Complex.( init_real( reduce(*, shape) ), init_imag( reduce(*, shape) ) ) |> x -> reshape( x, shape )
 
 DenseFFT( dim_in::Int, dim_out::Int; init=Flux.glorot_normal ) = DenseFFT( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
-
 
 Flux.@functor DenseFFT
 
 
-
-
-
-
-
-function audio_coder( input_size, in_channels, out_channels, kernel, stride, conv_type )
+function coder_conv( in_channels, out_channels, kernel, conv_type )
 
     return Chain(
+        
+        conv_type( kernel, in_channels => out_channels, pad=SamePad() ),
+        BatchNorm( out_channels ),
+        x -> relu.(x)
+    )
 
-        DenseFFT( input_size, input_size ), 
-        conv_type( (kernel, kernel), in_channels=>out_channels, stride=stride, pad=SamePad() )
+end
+
+
+
+function coder_block( in_channels, out_channels, input_size, output_size, conv_type )
+
+    return Chain( 
+        
+        DenseFFT(input_size, output_size), 
+        coder_conv( in_channels, out_channels, (1, 1), conv_type )...
 
     )
 
 end
 
 
-function audio_encoder(;input_size=1764, model_size=128, channels = [2, 16, 64, 128], kernels=[49, 9, 4] )
+function audio_coder(conv_type, channels, sizes )
 
-    layers = map( 1:length(kernels) ) do i
+    Chain( [ coder_block( channels[i], channels[i+1], sizes[i], sizes[i+1], conv_type ) for i in 1:length(channels)-1 ]... )
 
-        return audio_coder( input_size ÷ reduce(*, kernels[1:i]), channels[i], channels[i+1], kernels[i], kernels[i], Conv )
+end
 
-    end
 
-    return Chain( layers... )
+function audio_encoder(model_size, audio_size; channels=[2, 32, 64, model_size], sizes=[audio_size, 220, 32, 1])
+
+    return audio_coder( Conv, channels, sizes )
+
+end
+
+
+function audio_decoder(model_size, audio_size; channels=[model_size, 64, 32, 2], sizes=[1, 32, 220, audio_size])
+
+    return audio_coder( ConvTranspose, channels, sizes )
+
+end
+
+
+
+
+export init_complex_array, DenseFFT, audio_encoder, audio_decoder
 
 end

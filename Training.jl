@@ -67,22 +67,26 @@ function train_iteration( trainer::Trainer, data )
 end
 
 
+function init_trainer( model_creator, model_size, data_size, filename, optimizer, device )
 
-function AudioTrainer(; model_size=128, audio_size=1764, filename="data/models/audio", optimizer=ADAM(0.01), device=gpu )
-    
-    model   = create_audio_autoencoder( model_size, audio_size )
+    model   = model_creator( model_size, data_size )
     trainer = Trainer( model, optimizer, Flux.params( model.encoder, model.decoder, model.mean, model.std), model_size, device, 0 )
 
     serialize( filename, trainer )
 
 end
 
+
+
+function AudioTrainer(; model_size=128, audio_size=1764, filename="data/models/audio", optimizer=ADAM(0.01), device=gpu )
+    
+    init_trainer( create_audio_autoencoder, model_size, audio_size, filename, optimizer, device )
+
+end
+
 function VideoTrainer(; model_size=128, image_size=640, filename="data/models/video.bson", optimizer=ADAM(0.01), device=gpu )
     
-    model   = create_video_autoencoder( model_size, image_size )
-    trainer = Trainer( model, optimizer, Flux.params( model.encoder, model.decoder, model.mean, model.std), model_size, device, 0 )
-
-    serialize( filename, trainer )
+    init_trainer( create_audio_autoencoder, model_size, image_size, filename, optimizer, device )
 
 end
 

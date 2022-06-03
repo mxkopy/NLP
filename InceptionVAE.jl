@@ -1,8 +1,11 @@
+module InceptionVAE
+
+
 using Flux, Serialization, WAV, Zygote, Distributions, CUDA
-# https://github.com/koshian2/inception-vae/blob/master/vae_model.py
 
 
-
+# TODO: encoder_conv and decoder_conv are really similar, and could also be useful 
+# in the audio autoecoder. maybe it's a good idea to consolidate them somehow?
 function encoder_conv( in_channels, out_channels, kernel )
 
     return Chain(
@@ -36,20 +39,19 @@ function conv_group( conv_type, channels, bottleneck_channels, connection )
     conv1   = conv_type( bottleneck_channels, channels, (1, 1) )
     conv3   = conv_type( bottleneck_channels, channels, (3, 3) )
 
-    conv_3a = conv_type( bottleneck_channels, channels, (3, 1) )
-    conv_3b = conv_type( bottleneck_channels, channels, (1, 3) )
+    conv5   = conv_type( bottleneck_channels, bottleneck_channels, (3, 3) )
+    conv5v  = conv_type( bottleneck_channels, channels, (3, 1) )
+    conv5h  = conv_type( bottleneck_channels, channels, (1, 3) )
 
-    pool3 = MaxPool( (3, 3), stride=1, pad=1)
-    pool5 = MaxPool( (5, 5), stride=1, pad=2) 
+    pool3   = MaxPool( (3, 3), stride=1, pad=1)
 
+    g1    = Parallel( connection, conv5h, conv5v )
+    c1    = Chain( conv5, g1 )
 
-    g1    = Parallel( connection, conv1, conv3, conv_3a, conv_3b )
+    g2    = Parallel( connection, conv1, conv3, c1, pool3 )
+    c2    = Chain( bn, g2 )
 
-    c1    = Chain( bn, g1 )
-
-    g2    = Parallel( connection, c1, pool3, pool5 ) 
-
-    return g2
+    return c2
 
 end
 
@@ -160,11 +162,13 @@ function post_decoder( in_channels, image_size )
 
 end
 
+
+
 function inception_encoder(model_size; channels=[32, model_size], kernels=[4] )
 
     encode = inception_coder( encoder_block, channels, kernels )
 
-    return Chain( pre_encoder( channels[1] ), encode..., GlobalMeanPool(), x -> reshape( x, (model_size, 1, 1, :)) ) 
+    return Chain( pre_encoder( channels[1] ), encode..., GlobalMeanPool() ) 
 
 end
 
@@ -174,6 +178,12 @@ function inception_decoder(image_size; model_size=128, channels=[model_size, 64,
 
     decode = inception_coder( decoder_block, channels, kernels )
 
-    return Chain( x -> reshape( x, (1, 1, model_size, :) ), decode..., post_decoder( channels[end], image_size ) )
+    return Chain( decode..., post_decoder( channels[end], image_size ) )
+
+end
+
+
+
+export inception_encoder, inception_decoder
 
 end

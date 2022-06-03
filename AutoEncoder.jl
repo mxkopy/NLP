@@ -2,7 +2,7 @@ include("Model.jl")
 include("InceptionVAE.jl")
 include("AudioVAE.jl")
 
-using Flux, Serialization, WAV, Zygote, Distributions, CUDA
+using Flux, Serialization, WAV, Zygote, Distributions, CUDA, .InceptionVAE, .AudioVAE
  
 
 
@@ -20,12 +20,16 @@ end
 
 function (model::AutoEncoder)(param, data)
 
-    enc_out    = model.encoder( data ) |> model.dropout |> softmax
+    enc_out    = model.encoder( data ) |> model.dropout
+
+    enc_out    = permutedims( enc_out, (3, 1, 2, 4)) |> softmax
 
     means      = model.mean( enc_out )
     devs       = model.std( enc_out )
 
     latent     = ( param .* devs ) + means
+
+    latent     = permutedims( latent, (2, 3, 1, 4) )
 
     dec_out    = model.decoder( latent )
 
@@ -53,18 +57,11 @@ Flux.@functor AutoEncoder
 
 function create_audio_autoencoder( model_size=128, audio_size=1764 )
 
-    encoder = Chain(
-
-        audio_coder( audio_size, 2, 4, 3, 3, Conv )
+    encoder = audio_encoder( model_size, audio_size )
+    decoder = audio_decoder( model_size, audio_size )
     
-    )
-    
-    decoder = Chain(
-            
-    )
-    
-    mean         = Dense( model_size, model_size, celu )
-    std          = Dense( model_size, model_size, celu )
+    mean    = Dense( model_size, model_size, celu )
+    std     = Dense( model_size, model_size, celu )
 
     return AutoEncoder( encoder, decoder, mean, std, Dropout(0.5) ) 
 
