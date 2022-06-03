@@ -5,8 +5,8 @@ using Flux, FFTW, SliceMap
 
 struct DenseFFT
 
-    W::Array{Complex}
-    b::Array{Complex}
+    W::Array{<:Complex}
+    b::Array{<:Complex}
 
 end
 
@@ -34,6 +34,8 @@ init_complex_array( shape, init_real=Flux.glorot_normal, init_imag=init_real ) =
 DenseFFT( dim_in::Int, dim_out::Int; init=Flux.glorot_normal ) = DenseFFT( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
 
 Flux.@functor DenseFFT
+
+gpu( x::DenseFFT ) = DenseFFT( x.W |> gpu, x.b |> gpu )
 
 
 function coder_conv( in_channels, out_channels, kernel, conv_type )
