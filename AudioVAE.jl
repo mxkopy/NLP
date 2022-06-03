@@ -1,7 +1,7 @@
 using Flux, FFTW, SliceMap
 
 
-struct LinearIFFTLayer
+struct DenseIFFT
 
     W::Array{Complex}
     b::Array{Complex}
@@ -9,20 +9,25 @@ struct LinearIFFTLayer
 end
 
 
-function (layer::LinearIFFTLayer)(data::Array{Complex})
+function dense_ifft( layer::DenseIFFT, x::Vector{Complex} )
 
-    frequencies = NNlib.batched_mul(data, W) .+ layer.b
-    out         = FFTW.ifft( frequencies ) .|> real
-
-    return out
+    frq = ( x * layer.W ) .+ layer.b
+    out = FFTW.ifft( frq ) .|> real
 
 end
 
 
-init_complex_array( dim_in, dim_out ) = Complex.( init( dim_in * dim_out), init( dim_in * dim_out ) ) |> x -> reshape(x, (dim_in, dim_out) )
+function (layer::DenseIFFT)(data::Array{Complex})
+
+    return slicemap( x -> dense_ifft( layer, x ), data, dims=1 )
+
+end
 
 
-LinearIFFTLayer( dim_in, dim_out; init=Flux.glorot_normal ) = LinearIFFTLayer(  )
+init_complex_array( shape, init ) = Complex.( init( reduce(*, shape) ), init( reduce(*, shape) ) ) |> x -> reshape(x, shape )
+
+
+DenseIFFT( dim_in, dim_out; init=Flux.glorot_normal ) = DenseIFFT( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
 
 
 Flux.@functor IFFTKernel
