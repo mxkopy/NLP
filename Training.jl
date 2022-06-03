@@ -117,54 +117,10 @@ function train_loop( trainer::Trainer, iterator, savename; save_freq=1000 )
 end
 
 
-# function train_autoencoder( model_dir, data_dir, iterator_type, args; device=gpu )
-
-#     model, opt, parameters, args    = deserialize( model_dir )
-
-#     n, r_avg, d_avg                 = deserialize( data_dir * "/checkpoint" )
-
-#     data_itr                        = Iterators.drop( iterator_type( data_dir, iterator_type, args ), n )
-
-#     to_device( model, gpu )
-
-#     for (i, data) in enumerate( data_itr )
-
-#         param = rand( Normal( 1.0, 0.1 ), args["model-size"] )
-
-#         param = param .|> Float32 |> device
-#         data  = data  .|> Float32 |> device
-
-#         r_loss, d_loss = train_iter( model, opt, parameters, param, data )
-
-#         r_avg, d_avg   = (r_avg + r_loss) / (n + i), (d_avg + d_loss) / (n + i)
-
-#         next_save      = args["save-freq"] - ( (n + i) % args["save-freq"] ) - 1 
-
-#         @printf "\rr %.5e d %.5e r_avg %.5e d_avg %.5e next_save %d" r_loss d_loss r_avg d_avg next_save
-#         flush(stdout)
-
-#         if next_save == 0
-        
-#             println("model saved!")
-
-#             to_device( model, cpu )
-            
-#             serialize( model_dir, (model, opt, parameters, args) )
-#             serialize( data_dir * "/checkpoint", (n + i, r_avg, d_avg ) )
-
-#             to_device( model, gpu )
-
-#         end
-
-#     end
-
-# end
-
-
 
 function save_audio( data, output )
 
-    file = cat( data..., dims=1 )
+    file = reduce( (l, r) -> cat( l, r, dims=1 ), data )
 
     file = reshape(file, (size(file)[1], :))
 
@@ -188,15 +144,15 @@ end
 
 
 
-function test_autoencoder( model, data_dir, data_iterator, save_function, output, data_size, num_iter=10000 )
+function test_autoencoder( model, data_dir, data_iterator, save_function, output, model_size, num_iter=10000 )
 
     model.dropout = x -> x
 
-    data_itr      = Iterators.take( directory_iterator( data_dir, data_iterator, data_size ), num_iter )
+    data_itr      = Iterators.take( data_iterator, num_iter )
 
-    out = map( data_itr ) do data 
+    out = Iterators.map( data_itr ) do data 
 
-        return eval_model( (encoder, decoder, mean, std), ones(data_size), data )
+        return model( ones(model_size) .|> Float32, data .|> Float32 )
 
     end
 

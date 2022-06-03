@@ -11,21 +11,18 @@ end
 
 
 
-function dense_fft( layer::DenseFFT, data::AbstractArray{<:Real, 1} )
-
-    x   = FFTW.fft( data )
-    frq = ( transpose( layer.W ) * x ) .+ layer.b
-    out = FFTW.ifft( frq ) .|> real
-
-    return out
-
-end
-
-
-
 function (layer::DenseFFT)(data::AbstractArray{<:Real})
 
-    return slicemap( x -> dense_fft( layer, x ), data, dims=1 )
+    out = FFTW.fft( data, 1 )
+    out = reshape(out, ( 1, size(out)[1], : ) )
+
+    out = NNlib.batched_mul(out, layer.W)
+    out = reshape(out, (size(out)[2], :)) .+ layer.b
+
+    out = reshape(out, (length(layer.b), size(data)[2:end]...) )
+    out = FFTW.ifft(out, 1) .|> real
+
+    return out
 
 end
 

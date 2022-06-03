@@ -12,7 +12,7 @@ mutable struct AutoEncoder
     decoder::Chain
     mean::Dense
     std::Dense
-    dropout::Dropout
+    dropout
 
 end
 
