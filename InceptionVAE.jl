@@ -44,11 +44,12 @@ function conv_group( conv_type, channels, bottleneck_channels, connection )
     conv5h  = conv_type( bottleneck_channels, channels, (1, 3) )
 
     pool3   = MaxPool( (3, 3), stride=1, pad=1)
+    conv1_p = conv_type( bottleneck_channels, channels, (1, 1) )
 
     g1    = Parallel( connection, conv5h, conv5v )
     c1    = Chain( conv5, g1 )
 
-    g2    = Parallel( connection, conv1, conv3, c1, pool3 )
+    g2    = Parallel( connection, conv1, conv3, c1, conv1_p ∘ pool3 )
     c2    = Chain( bn, g2 )
 
     return c2

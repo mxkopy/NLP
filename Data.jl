@@ -74,9 +74,6 @@ struct BatchIterator
 end
 
 
-AudioIterator( dir, sample_size; batches=4 ) = BatchIterator( directory_iterator( dir, audio_iterator, sample_size ) |> Iterators.Stateful, batches )
-VideoIterator( dir, image_size; batches=4 )  = BatchIterator( directory_iterator( dir, video_iterator, image_size )  |> Iterators.Stateful, batches )
-
 
 function Base.iterate( itr::BatchIterator, state=itr.itr )
 
@@ -86,4 +83,5 @@ end
 
 
 
-
+AudioIterator( dir, sample_size; batches=4 ) = BatchIterator( directory_iterator( dir, audio_iterator, sample_size ) |> Iterators.Stateful, batches )
+VideoIterator( dir, image_size; batches=4 )  = BatchIterator( directory_iterator( dir, video_iterator, image_size )  |> Iterators.Stateful, batches )
