@@ -86,7 +86,7 @@ end
 
 function VideoTrainer(; model_size=128, image_size=640, filename="data/models/video.bson", optimizer=ADAM(0.01), device=gpu )
     
-    init_trainer( create_audio_autoencoder, model_size, image_size, filename, optimizer, device )
+    init_trainer( create_video_autoencoder, model_size, image_size, filename, optimizer, device )
 
 end
 
