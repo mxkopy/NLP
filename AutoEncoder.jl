@@ -56,7 +56,6 @@ function create_audio_autoencoder( model_size=128, audio_size=1764 )
     encoder = Chain(
 
         audio_coder( audio_size, 2, 4, 3, 3, Conv )
-        audio_coder( (audio_size ÷ 3) + 1,)
     
     )
     

@@ -1,26 +1,28 @@
 using Flux, FFTW, SliceMap
 
 
+struct LinearIFFTLayer
 
-struct IFFTKernel
-
-    # Kernel shape should be (size, 1)
-    kernel::Array{ComplexF32}
+    W::Array{Complex}
+    b::Array{Complex}
 
 end
 
 
-function (ifft::IFFTKernel)(data::Array{ComplexF32})
+function (layer::LinearIFFTLayer)(data::Array{Complex})
 
-    frequencies = ifft.kernel .* data
-    out         = FFTW.ifft( frequencies )
+    frequencies = NNlib.batched_mul(data, W) .+ layer.b
+    out         = FFTW.ifft( frequencies ) .|> real
 
     return out
 
 end
 
 
-IFFTKernel(size; init=Flux.glorot_normal) = IFFTKernel( init( size ) )
+init_complex_array( dim_in, dim_out ) = Complex.( init( dim_in * dim_out), init( dim_in * dim_out ) ) |> x -> reshape(x, (dim_in, dim_out) )
+
+
+LinearIFFTLayer( dim_in, dim_out; init=Flux.glorot_normal ) = LinearIFFTLayer(  )
 
 
 Flux.@functor IFFTKernel
