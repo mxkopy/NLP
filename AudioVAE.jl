@@ -11,7 +11,7 @@ end
 
 
 
-function dense_fft( layer::DenseFFT, data::AbstractArray{<: Real, 1} )
+function dense_fft( layer::DenseFFT, data::AbstractArray{<:Real, 1} )
 
     x   = FFTW.fft( data )
     frq = ( transpose( layer.W ) * x ) .+ layer.b
@@ -23,7 +23,7 @@ end
 
 
 
-function (layer::DenseFFT)(data::Array{<: Real})
+function (layer::DenseFFT)(data::AbstractArray{<:Real})
 
     return slicemap( x -> dense_fft( layer, x ), data, dims=1 )
 
