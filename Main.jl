@@ -127,7 +127,7 @@ if program_args["test-video"]
 
     trainer = deserialize(program_args["video-model-filename"])
     model   = trainer.model
-    itr     = VideoIterator( program_args["video-data"], program_args["video-size"], batches=1, rand_dist=[0], model_size=program_args["model-size"] ) 
+    itr     = VideoIterator( program_args["video-data"], program_args["image-size"], batches=1, rand_dist=[0], model_size=program_args["model-size"] ) 
     test_autoencoder(model, itr, save_video, "video_test.mp4", program_args["test-iterations"] )
 
 end

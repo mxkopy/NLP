@@ -124,7 +124,11 @@ function save_video( data, output )
 
     file = map( data ) do img
 
-        return reshape( img, (size(img)[3], size(img)[2], size(img)[1]) ) |> colorview
+        img = reshape( img, (size(img)[3], size(img)[2], size(img)[1]) )
+        img = N0f8.( image )
+        img = colorview(RGB, image)
+
+        return img
 
     end
 
@@ -136,20 +140,21 @@ end
 
 function test_autoencoder( model, data_iterator, save_function, output, num_iter )
 
-    data_itr      = Iterators.take( data_iterator, num_iter )
-
     testmode!( model )
 
     to_device( model, data_iterator.device )
 
-    out = Iterators.map( data_itr ) do (param, data) 
+    data = mapreduce( (l, r) -> cat( l, r, dims=1 ), Iterators.take( data_iterator, num_iter )) do (param, data)
 
         _, _, _, _, y = model( param, data )
+
         return y |> cpu
 
     end
 
-    save_function(out, output)
+    # data     = [ y |> cpu for (_, _, _, _, y) in [ model(param, data) for (param, data) in data_itr ] ]
+
+    save_function(data, output)
 
 end
 

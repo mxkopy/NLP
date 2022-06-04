@@ -1,4 +1,4 @@
-using FileIO, VideoIO, Images, WAV, CUDA
+using FileIO, VideoIO, Images, ImageTransformations, WAV, CUDA
 
 
 # data preprocessing

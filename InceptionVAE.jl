@@ -158,6 +158,7 @@ function post_decoder( in_channels, image_size )
         ConvTranspose((4, 4), in_channels=>8, stride=4),
         ConvTranspose((4, 4), 8=>4,           stride=4),
         ConvTranspose((4, 4), 4=>3,           stride=4),
+        x -> relu.(x),
         AdaptiveMeanPool((image_size, image_size))
     )
 
@@ -169,7 +170,7 @@ function inception_encoder(model_size; channels=[32, model_size], kernels=[4] )
 
     encode = inception_coder( encoder_block, channels, kernels )
 
-    return Chain( pre_encoder( channels[1] ), encode..., GlobalMeanPool() ) 
+    return Chain( pre_encoder( channels[1] ), encode..., GlobalMeanPool(), softmax, x -> permutedims(x, (3, 1, 2, 4)) ) 
 
 end
 
@@ -179,7 +180,7 @@ function inception_decoder(image_size; model_size=128, channels=[model_size, 64,
 
     decode = inception_coder( decoder_block, channels, kernels )
 
-    return Chain( decode..., post_decoder( channels[end], image_size ) )
+    return Chain(x -> permutedims(x, (2, 3, 1, 4)), decode..., post_decoder( channels[end], image_size ) )
 
 end
 

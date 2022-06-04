@@ -21,14 +21,10 @@ function (model::AutoEncoder)(param, data)
 
     enc_out    = model.encoder( data )
 
-    enc_out    = permutedims( enc_out, (3, 1, 2, 4)) |> softmax
-
     means      = model.mean( enc_out )
     devs       = model.std( enc_out )
 
     latent     = ( param .* devs ) + means
-
-    latent     = permutedims( latent, (2, 3, 1, 4) )
 
     dec_out    = model.decoder( latent )
 
@@ -58,8 +54,8 @@ function create_audio_autoencoder( model_size=128, audio_size=1764 )
     encoder = audio_encoder( model_size, audio_size )
     decoder = audio_decoder( model_size, audio_size )
     
-    mean    = Dense( model_size, model_size, relu )
-    std     = Dense( model_size, model_size, relu )
+    mean    = Dense( model_size, model_size )
+    std     = Dense( model_size, model_size )
 
     return AutoEncoder( encoder, decoder, mean, std ) 
 
@@ -72,8 +68,8 @@ function create_video_autoencoder( model_size=128, image_size=640 )
     encoder  = inception_encoder( model_size )
     decoder  = inception_decoder( image_size )
 
-    mean     = Dense( model_size, model_size, relu )
-    std      = Dense( model_size, model_size, relu )
+    mean     = Dense( model_size, model_size )
+    std      = Dense( model_size, model_size )
 
     return AutoEncoder( encoder, decoder, mean, std ) 
 
