@@ -60,7 +60,7 @@ function directory_iterator( data_dir, data_iterator, args... )
 
         return data_iterator( directory, args... )
 
-    end |> Iterators.flatten
+    end |> Iterators.flatten |> Iterators.Stateful
 
 end
 
@@ -70,18 +70,40 @@ struct BatchIterator
 
     itr
     batches::Int
+    model_size::Int
+    precision::DataType
+    device
+    rand_dist
 
 end
 
+
+function batch_data( itr, batches )
+
+    return reduce( (l, r) -> cat(l, r, dims=4), Iterators.take(itr, batches) )
+
+end
 
 
 function Base.iterate( itr::BatchIterator, state=itr.itr )
 
-    return isempty( state ) ? nothing : ( reduce( (l, r) -> cat(l, r, dims=4), Iterators.take(state, itr.batches) ), itr.itr )
+    param = rand( itr.rand_dist, itr.model_size ) .|> itr.precision |> itr.device
+    data  = batch_data(state, itr.batches)        .|> itr.precision |> itr.device
+
+    return isempty( state ) ? nothing : ( (param, data), itr.itr )
 
 end
 
 
 
-AudioIterator( dir, sample_size; batches=4 ) = BatchIterator( directory_iterator( dir, audio_iterator, sample_size ) |> Iterators.Stateful, batches )
-VideoIterator( dir, image_size; batches=4 )  = BatchIterator( directory_iterator( dir, video_iterator, image_size )  |> Iterators.Stateful, batches )
+function AudioIterator( dir, sample_size; batches=4, model_size=128, precision=Float32, device=gpu, rand_dist=Normal(0, 1) )
+
+    return BatchIterator( directory_iterator( dir, audio_iterator, sample_size ), batches, model_size, precision, device, rand_dist )
+
+end
+
+function VideoIterator( dir, image_size;  batches=4, model_size=128, precision=Float32, device=gpu, rand_dist=Normal(0, 1) )
+
+    return BatchIterator( directory_iterator( dir, video_iterator, image_size ) , batches, model_size, precision, device, rand_dist )
+
+end

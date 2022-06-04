@@ -12,7 +12,6 @@ mutable struct AutoEncoder
     decoder::Chain
     mean::Dense
     std::Dense
-    dropout
 
 end
 
@@ -20,7 +19,7 @@ end
 
 function (model::AutoEncoder)(param, data)
 
-    enc_out    = model.encoder( data ) |> model.dropout
+    enc_out    = model.encoder( data )
 
     enc_out    = permutedims( enc_out, (3, 1, 2, 4)) |> softmax
 
@@ -33,7 +32,7 @@ function (model::AutoEncoder)(param, data)
 
     dec_out    = model.decoder( latent )
 
-    return dec_out
+    return enc_out, means, devs, latent, dec_out
 
 end
 
@@ -45,7 +44,6 @@ function to_device(model::AutoEncoder, device)
     model.decoder = model.decoder |> device
     model.mean    = model.mean    |> device
     model.std     = model.std     |> device
-    model.dropout = model.dropout |> device
 
 end
 
@@ -60,10 +58,10 @@ function create_audio_autoencoder( model_size=128, audio_size=1764 )
     encoder = audio_encoder( model_size, audio_size )
     decoder = audio_decoder( model_size, audio_size )
     
-    mean    = Dense( model_size, model_size, celu )
-    std     = Dense( model_size, model_size, celu )
+    mean    = Dense( model_size, model_size, relu )
+    std     = Dense( model_size, model_size, relu )
 
-    return AutoEncoder( encoder, decoder, mean, std, Dropout(0.5) ) 
+    return AutoEncoder( encoder, decoder, mean, std ) 
 
 end    
 
@@ -74,10 +72,10 @@ function create_video_autoencoder( model_size=128, image_size=640 )
     encoder  = inception_encoder( model_size )
     decoder  = inception_decoder( image_size )
 
-    mean     = Dense( model_size, model_size, celu )
-    std      = Dense( model_size, model_size, celu )
+    mean     = Dense( model_size, model_size, relu )
+    std      = Dense( model_size, model_size, relu )
 
-    return AutoEncoder( encoder, decoder, mean, std, Dropout(0.5) ) 
+    return AutoEncoder( encoder, decoder, mean, std ) 
 
 end
 

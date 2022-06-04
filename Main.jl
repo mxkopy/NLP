@@ -24,7 +24,11 @@ function arguments()
 	        action = :store_true
 
         "--test-audio"
-	        action = :store_true
+            action = :store_true
+
+        "--test-iterations"
+            arg_type = Int
+            default  = 1000
 
         "--batches"
             arg_type = Int
@@ -90,9 +94,9 @@ if program_args["train-audio"]
 
     trainer  = deserialize( program_args["audio-model-filename"] )
 
-    iterator = Iterators.drop( AudioIterator( program_args["audio-data"],program_args["audio-size"], batches=program_args["batches"] ), trainer.checkpoint )
+    iterator = AudioIterator( program_args["audio-data"],program_args["audio-size"], batches=program_args["batches"] )
 
-    to_device(trainer.model, trainer.device)
+    to_device(trainer.model, iterator.device)
 
     train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])
 
@@ -102,9 +106,9 @@ if program_args["train-video"]
 
     trainer  = deserialize( program_args["video-model-filename"] )
 
-    iterator = Iterators.drop( VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"] ), trainer.checkpoint )
+    iterator = VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"] )
 
-    to_device(trainer.model, trainer.device)
+    to_device(trainer.model, iterator.device)
 
     train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])
 
@@ -114,8 +118,8 @@ if program_args["test-audio"]
 
     trainer = deserialize(program_args["audio-model-filename"])
     model   = trainer.model
-    itr     = AudioIterator( program_args["audio-data"], program_args["audio-size"], batches=1 ) 
-    test_autoencoder(model, "data/audio", itr, save_audio, "audio_test.wav", program_args["model-size"] )
+    itr     = AudioIterator( program_args["audio-data"], program_args["audio-size"], batches=1, rand_dist=[0], model_size=program_args["model-size"] ) 
+    test_autoencoder(model, itr, save_audio, "audio_test.wav", program_args["test-iterations"] )
 
 end
 
@@ -123,7 +127,7 @@ if program_args["test-video"]
 
     trainer = deserialize(program_args["video-model-filename"])
     model   = trainer.model
-    itr     = VideoIterator( program_args["video-data"], program_args["video-size"], batches=1 ) 
-    test_autoencoder(model, "data/video", itr, save_video, "video_test.mp4", program_args["model-size"] )
+    itr     = VideoIterator( program_args["video-data"], program_args["video-size"], batches=1, rand_dist=[0], model_size=program_args["model-size"] ) 
+    test_autoencoder(model, itr, save_video, "video_test.mp4", program_args["test-iterations"] )
 
 end

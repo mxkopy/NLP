@@ -28,9 +28,9 @@ end
 
 
 
-init_complex_array( shape, init_real=Flux.glorot_normal, init_imag=init_real ) = Complex.( init_real( reduce(*, shape) ), init_imag( reduce(*, shape) ) ) |> x -> reshape( x, shape )
+init_complex_array( shape, init_real=Flux.glorot_uniform, init_imag=Flux.glorot_uniform ) = Complex.( init_real( reduce(*, shape) ), init_imag( reduce(*, shape) ) ) |> x -> reshape( x, shape )
 
-DenseFFT( dim_in::Int, dim_out::Int; init=Flux.glorot_normal ) = DenseFFT( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
+DenseFFT( dim_in::Int, dim_out::Int; init=Flux.glorot_uniform ) = DenseFFT( init_complex_array( ( dim_in, dim_out ), init ), init_complex_array( dim_out, init ) )
 
 Flux.@functor DenseFFT
 
@@ -41,7 +41,7 @@ function coder_conv( in_channels, out_channels, kernel, conv_type )
         
         conv_type( kernel, in_channels => out_channels, pad=SamePad() ),
         BatchNorm( out_channels ),
-        x -> relu.(x)
+        x -> leakyrelu.(x)
     )
 
 end
@@ -51,9 +51,10 @@ end
 function coder_block( in_channels, out_channels, input_size, output_size, conv_type )
 
     return Chain( 
-        
+
+        coder_conv( in_channels, out_channels, (1, 1), conv_type )...,    
         DenseFFT(input_size, output_size), 
-        coder_conv( in_channels, out_channels, (1, 1), conv_type )...
+        Dropout(0.3)
 
     )
 
