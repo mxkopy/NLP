@@ -5,11 +5,11 @@ include("Data.jl")
 using Printf
 
 
-function loss_function( model, param, data ) 
+function loss_function( model, param, data, resizer ) 
 
     enc_out, means, devs, latent, dec_out = model(param, data)
 
-    MSE = Flux.Losses.mse( dec_out, data )
+    MSE = Flux.Losses.mse( resizer(dec_out), data )
 
     KLD = Flux.Losses.kldivergence( means, devs )
     
@@ -19,13 +19,13 @@ end
 
 
 
-function backprop_iteration( model, opt, parameters, param, data )
+function backprop_iteration( model, opt, parameters, param, data, resizer )
 
     r_loss, d_loss = 0, 0
 
     gs = gradient( parameters ) do
 
-        r_loss, d_loss = loss_function( model, param, data )
+        r_loss, d_loss = loss_function( model, param, data, resizer )
 
         return r_loss + 0.5 * d_loss
 
@@ -83,9 +83,11 @@ end
 
 function train_loop( trainer::Trainer, iterator, savename; save_freq=1000 )
 
+    resizer = AdaptiveMeanPool( iterator.data_size )
+
     for (i, (param, data)) in enumerate( Iterators.drop(iterator, trainer.checkpoint) )
 
-        r_loss, d_loss = backprop_iteration( trainer.model, trainer.optimizer, trainer.parameters, param, data )
+        r_loss, d_loss = backprop_iteration( trainer.model, trainer.optimizer, trainer.parameters, param, data, resizer )
 
         next_save = save_freq - ( i % save_freq ) - 1 
 
@@ -144,15 +146,15 @@ function test_autoencoder( model, data_iterator, save_function, output, num_iter
 
     to_device( model, data_iterator.device )
 
+    
+
     data = mapreduce( (l, r) -> cat( l, r, dims=1 ), Iterators.take( data_iterator, num_iter )) do (param, data)
 
         _, _, _, _, y = model( param, data )
 
-        return y |> cpu
+        return y
 
     end
-
-    # data     = [ y |> cpu for (_, _, _, _, y) in [ model(param, data) for (param, data) in data_itr ] ]
 
     save_function(data, output)
 

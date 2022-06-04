@@ -71,6 +71,7 @@ struct BatchIterator
     itr
     batches::Int
     model_size::Int
+    data_size
     precision::DataType
     device
     rand_dist
@@ -98,12 +99,12 @@ end
 
 function AudioIterator( dir, sample_size; batches=4, model_size=128, precision=Float32, device=gpu, rand_dist=Normal(0, 1) )
 
-    return BatchIterator( directory_iterator( dir, audio_iterator, sample_size ), batches, model_size, precision, device, rand_dist )
+    return BatchIterator( directory_iterator( dir, audio_iterator, sample_size ), batches, model_size, (sample_size, 1) ,precision, device, rand_dist )
 
 end
 
 function VideoIterator( dir, image_size;  batches=4, model_size=128, precision=Float32, device=gpu, rand_dist=Normal(0, 1) )
 
-    return BatchIterator( directory_iterator( dir, video_iterator, image_size ) , batches, model_size, precision, device, rand_dist )
+    return BatchIterator( directory_iterator( dir, video_iterator, image_size ) , batches, model_size, (image_size, image_size), precision, device, rand_dist )
 
 end
