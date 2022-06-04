@@ -6,7 +6,7 @@ using Flux, Serialization, WAV, Zygote, Distributions, CUDA, .InceptionVAE, .Aud
  
 
 
-struct AutoEncoder
+mutable struct AutoEncoder
 
     encoder::Chain
     decoder::Chain
