@@ -32,7 +32,7 @@ function arguments()
 
         "--batches"
             arg_type = Int
-            default  = 1
+            default  = 4
 
         "--save-freq"
             arg_type = Int
@@ -40,7 +40,7 @@ function arguments()
 
         "--model-size"
             arg_type = Int
-            default  = 128
+            default  = 64
 
         "--audio-size"
             arg_type = Int
@@ -48,7 +48,7 @@ function arguments()
 
         "--image-size"
             arg_type = Int
-            default  = 640
+            default  = 256
 
         "--audio-data"
             arg_type = String
@@ -94,7 +94,7 @@ if program_args["train-audio"]
 
     trainer  = deserialize( program_args["audio-model-filename"] )
 
-    iterator = AudioIterator( program_args["audio-data"],program_args["audio-size"], batches=program_args["batches"] )
+    iterator = AudioIterator( program_args["audio-data"],program_args["audio-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
 
     to_device(trainer.model, iterator.device)
 
@@ -106,7 +106,7 @@ if program_args["train-video"]
 
     trainer  = deserialize( program_args["video-model-filename"] )
 
-    iterator = VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"] )
+    iterator = VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
 
     to_device(trainer.model, iterator.device)
 
