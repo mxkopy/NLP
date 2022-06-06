@@ -50,7 +50,7 @@ Flux.@functor AutoEncoder
 
 
 
-function create_audio_autoencoder( model_size=64, audio_size=1764 )
+function create_audio_autoencoder( model_size=128, audio_size=1764 )
 
     encoder = audio_encoder( model_size, audio_size )
     decoder = audio_decoder( model_size, audio_size )
@@ -64,10 +64,10 @@ end
 
 
 
-function create_video_autoencoder( model_size=64 )
+function create_video_autoencoder( model_size=128 )
 
-    encoder  = resnet_encoder( model_size )
-    decoder  = resnet_decoder( model_size )
+    encoder  = inception_encoder( model_size=model_size )
+    decoder  = inception_decoder( model_size=model_size )
 
     mean     = Dense( model_size, model_size )
     std      = Dense( model_size, model_size )
