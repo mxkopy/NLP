@@ -127,8 +127,8 @@ function save_video( data, output )
     file = map( data ) do img
 
         img = reshape( img, (size(img)[3], size(img)[2], size(img)[1]) )
-        img = N0f8.( image )
-        img = colorview(RGB, image)
+        img = clamp.( img, N0f8 )
+        img = colorview(RGB, img)
 
         return img
 
@@ -150,7 +150,7 @@ function test_autoencoder( model, data_iterator, save_function, output, num_iter
 
         _, _, _, _, y = model( param, data )
 
-        return y |> cpu
+        return [y |> cpu]
 
     end
 

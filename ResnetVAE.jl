@@ -48,7 +48,7 @@ function decoder_block( in_channels, out_channels, upsample )
 end
 
 
-function resnet_encoder( model_size )
+function resnet_encoder(; model_size=128 )
 
     return Chain(
 
@@ -62,7 +62,7 @@ function resnet_encoder( model_size )
 end
 
 
-function resnet_decoder( model_size )
+function resnet_decoder(; model_size=128 )
 
     return Chain(
 
