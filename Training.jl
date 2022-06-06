@@ -11,7 +11,7 @@ function loss_function( model, param, data, resizer )
 
     MSE = Flux.Losses.mse( resizer(dec_out), data )
 
-    KLD = Flux.Losses.kldivergence( means, devs )
+    KLD = Flux.Losses.kldivergence( means |> softmax, devs |> softmax )
     
     return MSE, KLD
 
@@ -57,9 +57,9 @@ end
 
 
 
-function init_trainer( model_creator, model_size, data_size, filename, optimizer, device )
+function init_trainer( model_creator, model_args, filename, optimizer, device )
 
-    model   = model_creator( model_size, data_size )
+    model   = model_creator( model_args... )
     trainer = Trainer( model, optimizer, Flux.params( model.encoder, model.decoder, model.mean, model.std), 0 )
 
     serialize( filename, trainer )
@@ -70,13 +70,13 @@ end
 
 function AudioTrainer(; model_size=128, audio_size=1764, filename="data/models/audio", optimizer=ADAM(0.01), device=gpu )
     
-    init_trainer( create_audio_autoencoder, model_size, audio_size, filename, optimizer, device )
+    init_trainer( create_audio_autoencoder, (model_size, audio_size), filename, optimizer, device )
 
 end
 
 function VideoTrainer(; model_size=128, image_size=640, filename="data/models/video.bson", optimizer=ADAM(0.01), device=gpu )
     
-    init_trainer( create_video_autoencoder, model_size, image_size, filename, optimizer, device )
+    init_trainer( create_video_autoencoder, (model_size, ), filename, optimizer, device )
 
 end
 
@@ -146,13 +146,11 @@ function test_autoencoder( model, data_iterator, save_function, output, num_iter
 
     to_device( model, data_iterator.device )
 
-    
-
     data = mapreduce( (l, r) -> cat( l, r, dims=1 ), Iterators.take( data_iterator, num_iter )) do (param, data)
 
         _, _, _, _, y = model( param, data )
 
-        return y
+        return y |> cpu
 
     end
 
