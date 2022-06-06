@@ -15,7 +15,7 @@ end
 
 function video_iterator( dir, image_size )
 
-    return Iterators.map( x -> imresize(x, (image_size, image_size) ) |> image_to_array, VideoIO.load( dir ) )
+    return Iterators.map( x -> imresize(x, (image_size, image_size) ) |> image_to_array, VideoIO.openvideo( dir ) )
 
 end
 
