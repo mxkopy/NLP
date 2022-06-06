@@ -90,10 +90,9 @@ end
 function encoder_block( kernel, in_channels, out_channels )
 
     encoder    = encoder_module( in_channels )
-
     downsample = downsampler( kernel, in_channels, out_channels )
 
-    return Chain( encoder, downsample )
+    return Chain( SkipConnection(encoder, +), downsample )
 
 end
 
@@ -105,7 +104,7 @@ function decoder_block( kernel, in_channels, out_channels )
 
     upsample = upsampler( kernel, in_channels, out_channels )
 
-    return Chain( decoder, upsample )
+    return Chain( SkipConnection(decoder, +), upsample )
 
 end
 
@@ -124,7 +123,7 @@ function pre_encoder( out_channels )
     return Chain(
 
         downsampler( 3, 3, 4 ), 
-        downsampler( 3, 4, 8 )
+        downsampler( 3, 4, out_channels )
 
     )
 
@@ -144,7 +143,7 @@ end
 
 
 
-function inception_encoder(; model_size=128, kernels=[4, 4], channels=[3, 32, model_size] )
+function inception_encoder(; model_size=128, kernels=[4, 4], channels=[16, 32, model_size] )
 
     pre_encoder_ = pre_encoder( channels[1] )
 
@@ -154,13 +153,13 @@ function inception_encoder(; model_size=128, kernels=[4, 4], channels=[3, 32, mo
 
     reshaper     = x -> permutedims(x, (3, 1, 2, 4))
 
-    return Chain( encoder..., mean_pool, reshaper ) 
+    return Chain( pre_encoder_..., encoder..., mean_pool, reshaper ) 
 
 end
 
 
 
-function inception_decoder(; model_size=128, kernels=[4, 4], channels=[model_size, 32, 4] )
+function inception_decoder(; model_size=128, kernels=[4, 4], channels=[model_size, 32, 16] )
 
     reshaper      = x -> permutedims( x, (2, 3, 1, 4) )
 
