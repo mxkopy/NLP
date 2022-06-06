@@ -4,26 +4,11 @@ module InceptionVAE
 using Flux, Serialization, WAV, Zygote, Distributions, CUDA
 
 
-# TODO: encoder_conv and decoder_conv are really similar, and could also be useful 
-# in the audio autoecoder. maybe it's a good idea to consolidate them somehow?
-function encoder_conv( in_channels, out_channels, kernel )
+function conv_block( conv_type, kernel, in_channels, out_channels )
 
     return Chain(
         
-        Conv( kernel, in_channels => out_channels, pad=SamePad() ),
-        BatchNorm( out_channels ),
-        x -> relu.(x)
-    )
-
-end
-
-
-
-function decoder_conv( in_channels, out_channels, kernel )
-
-    return Chain(
-        
-        ConvTranspose( kernel, in_channels => out_channels, pad=SamePad() ),
+        conv_type( kernel, in_channels => out_channels, pad=SamePad(), stride=stride ),
         BatchNorm( out_channels ),
         x -> relu.(x)
     )
@@ -34,17 +19,17 @@ end
 
 function conv_group( conv_type, channels, bottleneck_channels, connection )
 
-    bn      = conv_type( channels, bottleneck_channels, (1, 1) )
+    bn      = conv_block( conv_type, (1, 1), channels, bottleneck_channels )
 
-    conv1   = conv_type( bottleneck_channels, channels, (1, 1) )
-    conv3   = conv_type( bottleneck_channels, channels, (3, 3) )
+    conv1   = conv_block( conv_type, (1, 1), bottleneck_channels, channels )
+    conv3   = conv_block( conv_type, (3, 3), bottleneck_channels, channels)
 
-    conv5   = conv_type( bottleneck_channels, bottleneck_channels, (3, 3) )
-    conv5v  = conv_type( bottleneck_channels, channels, (3, 1) )
-    conv5h  = conv_type( bottleneck_channels, channels, (1, 3) )
+    conv5   = conv_block( conv_type, (3, 3), bottleneck_channels, bottleneck_channels )
+    conv5v  = conv_block( conv_type, (3, 1), bottleneck_channels, channels )
+    conv5h  = conv_block( conv_type, (1, 3), bottleneck_channels, channels )
 
     pool3   = MaxPool( (3, 3), stride=1, pad=1)
-    conv1_p = conv_type( bottleneck_channels, channels, (1, 1) )
+    conv1_p = conv_block( conv_type, (1, 1), bottleneck_channels, channels )
 
     g1    = Parallel( connection, conv5h, conv5v )
     c1    = Chain( conv5, g1 )
@@ -60,7 +45,7 @@ end
 function encoder_module( channels )
 
     # connection in the paper is (x...) -> cat( x..., dims=3), but that is super resource intensive
-    return conv_group( encoder_conv, channels, channels ÷ 2, + )
+    return conv_group( Conv, channels, channels ÷ 2, + )
 
 end
 
@@ -68,22 +53,19 @@ end
 
 function decoder_module( channels )
 
-    return conv_group( decoder_conv, channels, channels ÷ 4, + )
+    return conv_group( ConvTranspose, channels, channels ÷ 4, + )
 
 end
 
 
 
-function downsampler( in_channels, out_channels, kernel )
+function downsampler( kernel, in_channels, out_channels )
 
     return Chain( 
 
-        MeanPool( (kernel, kernel) ), 
-
+        MeanPool( ( kernel, kernel) ), 
         Conv( (1, 1), in_channels => out_channels ),
-
         BatchNorm( out_channels ), 
-        
         x -> relu.(x)
     )
 
@@ -91,14 +73,13 @@ end
 
 
 
-function upsampler( in_channels, out_channels, kernel )
+function upsampler( upsample, in_channels, out_channels )
 
     return Chain( 
 
-        ConvTranspose( (kernel, kernel), in_channels => out_channels, stride=kernel ),
-
-        BatchNorm( out_channels ), 
-        
+        Upsample(upsample),
+        ConvTranspose( (3, 3), in_channels => out_channels, pad=SamePad(), stride=1 ),
+        BatchNorm(out_channels), 
         x -> relu.(x)
     )
 
@@ -106,11 +87,11 @@ end
 
 
 
-function encoder_block( in_channels, out_channels, kernel )
+function encoder_block( kernel, in_channels, out_channels )
 
     encoder    = encoder_module( in_channels )
 
-    downsample = downsampler( in_channels, out_channels, kernel )
+    downsample = downsampler( kernel, in_channels, out_channels )
 
     return Chain( encoder, downsample )
 
@@ -118,11 +99,11 @@ end
 
 
 
-function decoder_block( in_channels, out_channels, kernel )
+function decoder_block( kernel, in_channels, out_channels )
 
     decoder  = decoder_module( in_channels )
 
-    upsample = upsampler( in_channels, out_channels, kernel )
+    upsample = upsampler( kernel, in_channels, out_channels )
 
     return Chain( decoder, upsample )
 
@@ -130,9 +111,9 @@ end
 
 
 
-function inception_coder( block_type, channels, kernels )
+function inception_coder( block_type, kernels, channels )
 
-    return Chain( [ block_type(channels[i], channels[i+1], kernels[i] ) for i in 1:length(kernels) ]... )
+    return Chain( [ block_type(kernels[i], channels[i], channels[i+1] ) for i in 1:length(kernels) ]... )
 
 end
 
@@ -142,44 +123,52 @@ function pre_encoder( out_channels )
 
     return Chain(
 
-        Conv((3, 3), 3 => 4,            stride=2),
-        Conv((3, 3), 4 => 8,            stride=2),
-        Conv((3, 3), 8 => out_channels, stride=2)
+        downsampler( 3, 3, 4 ), 
+        downsampler( 3, 4, 8 )
 
     )
 
 end
 
 
-function post_decoder( in_channels, image_size )
+function post_decoder( in_channels )
 
     return Chain(
 
-        ConvTranspose((4, 4), in_channels=>8, stride=4),
-        ConvTranspose((4, 4), 8=>4,           stride=4),
-        ConvTranspose((2, 2), 4=>3,           stride=2),
-        x -> relu.(x)
+        upsampler( 4, in_channels, 8 ),
+        upsampler( 4, 8, 3 ), 
+        ConvTranspose( (3, 3), )
     )
 
 end
 
 
 
-function inception_encoder(model_size; channels=[32, model_size], kernels=[4] )
+function inception_encoder(; model_size=128, kernels=[4, 4], channels=[3, 32, model_size] )
 
-    encode = inception_coder( encoder_block, channels, kernels )
+    pre_encoder_ = pre_encoder( channels[1] )
 
-    return Chain( pre_encoder( channels[1] ), encode..., GlobalMeanPool(), x -> permutedims(x, (3, 1, 2, 4)), softmax ) 
+    encoder      = inception_coder( kernels, encoder_block, channels )
+
+    mean_pool    = GlobalMeanPool()
+
+    reshaper     = x -> permutedims(x, (3, 1, 2, 4))
+
+    return Chain( encoder..., mean_pool, reshaper ) 
 
 end
 
 
 
-function inception_decoder(image_size; model_size=128, channels=[model_size, 64, 32], kernels=[4, 4] )
+function inception_decoder(; model_size=128, kernels=[4, 4], channels=[model_size, 32, 4] )
 
-    decode = inception_coder( decoder_block, channels, kernels )
+    reshaper      = x -> permutedims( x, (2, 3, 1, 4) )
 
-    return Chain(x -> permutedims(x, (2, 3, 1, 4)), decode..., post_decoder( channels[end], image_size ) )
+    decoder       = inception_coder( kernels, decoder_block, channels )
+
+    post_decoder_ = post_decoder( channels[end] )
+
+    return Chain( reshaper, decoder..., post_decoder_... )
 
 end
 
