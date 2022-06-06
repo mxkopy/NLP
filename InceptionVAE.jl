@@ -4,7 +4,7 @@ module InceptionVAE
 using Flux, Serialization, WAV, Zygote, Distributions, CUDA
 
 
-function conv_block( conv_type, kernel, in_channels, out_channels )
+function conv_block( conv_type, kernel, in_channels, out_channels, stride=1 )
 
     return Chain(
         
@@ -78,7 +78,7 @@ function upsampler( upsample, in_channels, out_channels )
     return Chain( 
 
         Upsample(upsample),
-        ConvTranspose( (3, 3), in_channels => out_channels, pad=SamePad(), stride=1 ),
+        ConvTranspose( (3, 3), in_channels => out_channels, pad=SamePad() ),
         BatchNorm(out_channels), 
         x -> relu.(x)
     )
@@ -136,8 +136,8 @@ function post_decoder( in_channels )
     return Chain(
 
         upsampler( 4, in_channels, 8 ),
-        upsampler( 4, 8, 3 ), 
-        ConvTranspose( (3, 3), )
+        upsampler( 4, 8, 3 )
+        # ConvTranspose( (3, 3), )
     )
 
 end
@@ -148,7 +148,7 @@ function inception_encoder(; model_size=128, kernels=[4, 4], channels=[3, 32, mo
 
     pre_encoder_ = pre_encoder( channels[1] )
 
-    encoder      = inception_coder( kernels, encoder_block, channels )
+    encoder      = inception_coder( encoder_block, kernels, channels )
 
     mean_pool    = GlobalMeanPool()
 
@@ -164,7 +164,7 @@ function inception_decoder(; model_size=128, kernels=[4, 4], channels=[model_siz
 
     reshaper      = x -> permutedims( x, (2, 3, 1, 4) )
 
-    decoder       = inception_coder( kernels, decoder_block, channels )
+    decoder       = inception_coder( decoder_block, kernels, channels )
 
     post_decoder_ = post_decoder( channels[end] )
 
