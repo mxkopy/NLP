@@ -8,9 +8,9 @@ function conv_block( conv_type, kernel, in_channels, out_channels, stride=1 )
 
     return Chain(
         
-        conv_type( kernel, in_channels => out_channels, pad=SamePad(), stride=stride ),
-        BatchNorm( out_channels ),
-        x -> relu.(x)
+        conv_type( kernel, in_channels => out_channels, sigmoid, pad=SamePad(), stride=stride ),
+        BatchNorm( out_channels )
+        # x -> relu.(x)
     )
 
 end
@@ -59,14 +59,13 @@ end
 
 
 
-function downsampler( kernel, in_channels, out_channels )
+function downsampler( stride, in_channels, out_channels )
 
     return Chain( 
 
-        MeanPool( ( kernel, kernel) ), 
-        Conv( (1, 1), in_channels => out_channels ),
-        BatchNorm( out_channels ), 
-        x -> relu.(x)
+        # MeanPool( ( kernel, kernel) ), 
+        Conv( (3, 3), in_channels => out_channels, relu, stride=stride ),
+        BatchNorm( out_channels ) 
     )
 
 end
@@ -77,10 +76,8 @@ function upsampler( upsample, in_channels, out_channels )
 
     return Chain( 
 
-        Upsample(upsample),
-        ConvTranspose( (3, 3), in_channels => out_channels, pad=SamePad() ),
-        BatchNorm(out_channels), 
-        x -> relu.(x)
+        Upsample(upsample * 2),
+        Conv( (3, 3), in_channels => out_channels, relu, pad=SamePad(), stride=2 ),
     )
 
 end
