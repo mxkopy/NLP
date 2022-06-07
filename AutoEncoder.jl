@@ -55,8 +55,8 @@ function create_audio_autoencoder( model_size=128, audio_size=1764 )
     encoder = audio_encoder( model_size, audio_size )
     decoder = audio_decoder( model_size, audio_size )
     
-    mean    = Dense( model_size, model_size )
-    std     = Dense( model_size, model_size )
+    mean    = Dense( model_size, model_size, relu )
+    std     = Dense( model_size, model_size, relu )
 
     return AutoEncoder( encoder, decoder, mean, std ) 
 
@@ -69,8 +69,8 @@ function create_video_autoencoder( model_size=128 )
     encoder  = inception_encoder( model_size=model_size )
     decoder  = inception_decoder( model_size=model_size )
 
-    mean     = Dense( model_size, model_size )
-    std      = Dense( model_size, model_size )
+    mean     = Dense( model_size, model_size, relu )
+    std      = Dense( model_size, model_size, relu )
 
     return AutoEncoder( encoder, decoder, mean, std ) 
 
