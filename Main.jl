@@ -32,7 +32,11 @@ function arguments()
 
         "--batches"
             arg_type = Int
-            default  = 4
+            default  = 1
+
+        "--epochs"
+            arg_type = Int
+            default  = 8
 
         "--save-freq"
             arg_type = Int
@@ -40,7 +44,7 @@ function arguments()
 
         "--model-size"
             arg_type = Int
-            default  = 64
+            default  = 128
 
         "--audio-size"
             arg_type = Int
@@ -94,11 +98,14 @@ if program_args["train-audio"]
 
     trainer  = deserialize( program_args["audio-model-filename"] )
 
-    iterator = AudioIterator( program_args["audio-data"],program_args["audio-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
+    for epoch in 1:program_args["epochs"]
 
-    to_device(trainer.model, iterator.device)
+        iterator = AudioIterator( program_args["audio-data"],program_args["audio-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
+        to_device(trainer.model, iterator.device)
+        train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])
+        trainer.checkpoint = 0
 
-    train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])
+    end
 
 end
 
@@ -106,12 +113,14 @@ if program_args["train-video"]
 
     trainer  = deserialize( program_args["video-model-filename"] )
 
-    iterator = VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
+    for epoch in 1:program_args["epochs"]
 
-    to_device(trainer.model, iterator.device)
+        iterator = VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
+        to_device(trainer.model, iterator.device)
+        train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])  
+        trainer.checkpoint = 0
 
-    train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])
-
+    end
 end
 
 if program_args["test-audio"]

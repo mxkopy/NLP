@@ -9,11 +9,11 @@ function loss_function( model, param, data, resizer )
 
     enc_out, means, devs, latent, dec_out = model(param, data)
 
-    MSE = Flux.Losses.mse( resizer(dec_out), data )
+    MSLE = Flux.Losses.mse( resizer(dec_out), data )
 
-    KLD = Flux.Losses.kldivergence( means |> softmax, devs |> softmax )
-    
-    return MSE, KLD
+    KLD  = Flux.Losses.kldivergence( means |> softmax, devs |> softmax )
+
+    return MSLE, KLD
 
 end
 
@@ -68,13 +68,13 @@ end
 
 
 
-function AudioTrainer(; model_size=128, audio_size=1764, filename="data/models/audio", optimizer=ADAM(0.01), device=gpu )
+function AudioTrainer(; model_size=128, audio_size=1764, filename="data/models/audio", optimizer=ADAM(1e-4), device=gpu )
     
     init_trainer( create_audio_autoencoder, (model_size, audio_size), filename, optimizer, device )
 
 end
 
-function VideoTrainer(; model_size=128, image_size=640, filename="data/models/video.bson", optimizer=ADAM(0.01), device=gpu )
+function VideoTrainer(; model_size=128, image_size=640, filename="data/models/video.bson", optimizer=ADAM(1e-4), device=gpu )
     
     init_trainer( create_video_autoencoder, (model_size, ), filename, optimizer, device )
 
@@ -126,7 +126,7 @@ function save_video( data, output )
 
     file = map( data ) do img
 
-        img = reshape( img, (size(img)[3], size(img)[2], size(img)[1]) )
+        img = reshape( img, (size(img)[3], size(img)[2], size(img)[1]) ) |> unit_denormalize
         img = clamp.( img, N0f8 )
         img = colorview(RGB, img)
 

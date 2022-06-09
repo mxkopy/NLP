@@ -2,8 +2,12 @@ using FileIO, VideoIO, Images, ImageTransformations, WAV, CUDA
 
 
 # data preprocessing
-reshape_audio =  x -> reshape(Float32.(x), (size(x)[1], 1, size(x)[2], :) )
-reshape_video =  x -> reshape(Float32.(x), (size(x)[3], size(x)[2], size(x)[1], :) )
+
+unit_normalize   = x -> ( x .* 2 ) .- 1
+unit_denormalize = x -> ( x .+ 1 ) ./ 2
+
+reshape_audio    = x -> reshape(Float32.(x), (size(x)[1], 1, size(x)[2], :) )  
+reshape_video    = x -> reshape(Float32.(x), (size(x)[3], size(x)[2], size(x)[1], :) ) |> unit_normalize
 
 
 function image_to_array( image )
@@ -97,13 +101,13 @@ end
 
 
 
-function AudioIterator( dir, sample_size; batches=4, model_size=128, precision=Float32, device=gpu, rand_dist=Normal(0, 1) )
+function AudioIterator( dir, sample_size; batches=1, model_size=128, precision=Float32, device=gpu, rand_dist=Normal(0, 1) )
 
     return BatchIterator( directory_iterator( dir, audio_iterator, sample_size ), batches, model_size, (sample_size, 1) ,precision, device, rand_dist )
 
 end
 
-function VideoIterator( dir, image_size;  batches=4, model_size=128, precision=Float32, device=gpu, rand_dist=Normal(0, 1) )
+function VideoIterator( dir, image_size;  batches=1, model_size=128, precision=Float32, device=gpu, rand_dist=Normal(0, 1) )
 
     return BatchIterator( directory_iterator( dir, video_iterator, image_size ) , batches, model_size, (image_size, image_size), precision, device, rand_dist )
 

@@ -72,12 +72,12 @@ end
 
 
 
-function upsampler( upsample, in_channels, out_channels )
+function upsampler( upsample, in_channels, out_channels, stride=2 )
 
     return Chain( 
 
         Upsample(upsample * 2),
-        Conv( (3, 3), in_channels => out_channels, relu, pad=SamePad(), stride=2 ),
+        Conv( (3, 3), in_channels => out_channels, relu, pad=SamePad(), stride=stride ),
     )
 
 end
