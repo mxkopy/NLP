@@ -1,4 +1,4 @@
-include("Training.jl")
+include("AutoEncoderTraining.jl")
 
 using ArgParse
 
@@ -36,11 +36,11 @@ function arguments()
 
         "--epochs"
             arg_type = Int
-            default  = 8
+            default  = 1
 
         "--save-freq"
             arg_type = Int
-            default  = 5000
+            default  = 10
 
         "--model-size"
             arg_type = Int
@@ -80,30 +80,32 @@ end
 program_args = arguments()
 
 
-
-
 if program_args["init-audio"]
 
-    AudioTrainer( model_size=program_args["model-size"], audio_size=program_args["audio-size"], filename=program_args["audio-model-filename"] )
+    model      = create_audio_autoencoder( program_args["model-size"], program_args["audio-size"] )
+    optimizer  = ADAM(0.001)
+
+    @save program_args["audio-model-filename"] model optimizer
 
 end
 
 if program_args["init-video"]
 
-    VideoTrainer( model_size=program_args["model-size"], image_size=program_args["image-size"], filename=program_args["video-model-filename"] )
+    model      = create_video_autoencoder( program_args["model-size"] )
+    optimizer  = ADAM(0.01)
+
+    @save program_args["video-model-filename"] model optimizer
 
 end
 
 if program_args["train-audio"]
 
-    trainer  = deserialize( program_args["audio-model-filename"] )
+    @load program_args["audio-model-filename"] model optimizer
 
     for epoch in 1:program_args["epochs"]
 
-        iterator = AudioIterator( program_args["audio-data"],program_args["audio-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
-        to_device(trainer.model, iterator.device)
-        train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])
-        trainer.checkpoint = 0
+        itr = AudioIterator( program_args["audio-data"], program_args["audio-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
+        train_autoencoder(model |> itr.device, optimizer, itr, program_args["audio-model-filename"], save_freq=program_args["save-freq"], epochs=program_args["epochs"] )
 
     end
 
@@ -111,32 +113,28 @@ end
 
 if program_args["train-video"]
 
-    trainer  = deserialize( program_args["video-model-filename"] )
+    @load program_args["video-model-filename"] model optimizer
 
     for epoch in 1:program_args["epochs"]
 
-        iterator = VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
-        to_device(trainer.model, iterator.device)
-        train_loop(trainer, iterator, program_args["video-model-filename"], save_freq=program_args["save-freq"])  
-        trainer.checkpoint = 0
+        itr = VideoIterator( program_args["video-data"], program_args["image-size"], batches=program_args["batches"], model_size=program_args["model-size"] )
+        train_autoencoder(model |> itr.device, optimizer, itr, program_args["video-model-filename"], save_freq=program_args["save-freq"], epochs=program_args["epochs"] )  
 
     end
 end
 
 if program_args["test-audio"]
 
-    trainer = deserialize(program_args["audio-model-filename"])
-    model   = trainer.model
-    itr     = AudioIterator( program_args["audio-data"], program_args["audio-size"], batches=1, rand_dist=[0], model_size=program_args["model-size"] ) 
-    test_autoencoder(model, itr, save_audio, "audio_test.wav", program_args["test-iterations"] )
+    @load program_args["audio-model-filename"] model optimizer
+    itr = AudioIterator( program_args["audio-data"], program_args["audio-size"], batches=1, rand_dist=[0], model_size=program_args["model-size"] ) 
+    test_autoencoder(model |> itr.device, itr, save_audio, "audio_test.wav", program_args["test-iterations"] )
 
 end
 
 if program_args["test-video"]
 
-    trainer = deserialize(program_args["video-model-filename"])
-    model   = trainer.model
-    itr     = VideoIterator( program_args["video-data"], program_args["image-size"], batches=1, rand_dist=[0], model_size=program_args["model-size"] ) 
-    test_autoencoder(model, itr, save_video, "video_test.mp4", program_args["test-iterations"] )
+    @load program_args["video-model-filename"] model optimizer
+    itr = VideoIterator( program_args["video-data"], program_args["image-size"], batches=1, rand_dist=[0], model_size=program_args["model-size"] ) 
+    test_autoencoder(model |> itr.device, itr, save_video, "video_test.mp4", program_args["test-iterations"] )
 
 end
