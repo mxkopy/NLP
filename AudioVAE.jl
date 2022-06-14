@@ -1,81 +1,100 @@
 module AudioVAE
 
-using Flux, FFTW, SliceMap
-
-struct DenseFFT
-
-    W::AbstractArray{<:Complex}
-    b::Union{AbstractArray{<:Complex}, Bool}
-    a::Function
-
-end
+using Flux, CUDA
 
 
+function dilated_conv_block( dilation; kernel=256, in_channels=2, out_channels=2 )
 
-function (layer::DenseFFT)(data::AbstractArray{<:Real})
+    conv_f     = Conv((kernel, 1), in_channels => in_channels, dilation=dilation, pad=SamePad())
+    conv_g     = Conv((kernel, 1), in_channels => in_channels, dilation=dilation, pad=SamePad())
 
-    out = layer.a.( data )
-    out = FFTW.fft( out, 1 )
-    out = reshape(out, ( 1, size(out)[1], : ) )
+    conv_F     = Chain( conv_f, x-> tanh.(x) )
+    conv_G     = Chain( conv_g, x-> sigmoid.(x) )
 
-    out = NNlib.batched_mul(out, layer.W)
-    out = reshape(out, (size(out)[2], :)) .+ layer.b
+    conv       = Conv( (1, 1), in_channels => out_channels )
 
-    out = reshape(out, (:, size(data)[2:end]...) )
-    out = FFTW.ifft(out, 1) .|> real
+    gated_conv = Parallel( (l, r) -> l .* r, conv_F, conv_G )
 
-    return out
+    return Chain( SkipConnection( gated_conv, + ), conv ) 
 
 end
 
 
-init_complex_array( shape, init_real=Flux.glorot_uniform, init_imag=Flux.glorot_uniform ) = Complex.( init_real( reduce(*, shape) ), init_imag( reduce(*, shape) ) ) |> x -> reshape( x, shape )
+function downsampler( in_channels )
 
-DenseFFT( dim_in::Int, dim_out::Int, activation=identity; init=Flux.glorot_uniform, bias=true ) = DenseFFT( init_complex_array( ( dim_in, dim_out ), init ), bias ? init_complex_array( dim_out, init ) : false, activation ) 
+    return Chain( 
 
-Flux.@functor DenseFFT
+        Conv((3, 1), in_channels => 4, stride=2, pad=SamePad()), 
+        Conv((3, 1), 4 => 2,           stride=2, pad=SamePad()), 
+        Conv((3, 1), 2 => 1,           stride=2, pad=SamePad())
 
-
-function residual_fft_block( output_size )
-
-    return SkipConnection( DenseFFT( output_size, output_size ), + )
-
-end
-
-
-function audio_encoder(model_size, audio_size)
-
-    return Chain(
-
-        Conv( (3, 1), 2 => 4,   stride=1 ),
-        Conv( (5, 1), 4 => 8,   stride=2 ),
-        Conv( (5, 1), 8 => 16,  stride=2 ),
-        Conv( (5, 1), 16 => 32, stride=2 ),
-        AdaptiveMeanPool( (model_size, 1)),
-        # DenseFFT( model_size, model_size )
- 
     )
 
 end
 
 
-function audio_decoder(model_size, audio_size )
+function upsampler( out_channels )
 
-    return Chain(
+    return Chain( 
 
-        # DenseFFT( model_size, model_size, bias=false ),
-        ConvTranspose( (5, 1),   32 => 16, stride=2 ),
-        ConvTranspose( (5, 1),   16 => 8,  stride=2 ),
-        ConvTranspose( (5, 1),   8 => 4,   stride=2 ),
-        ConvTranspose( (5, 1),   4 => 4,   stride=2 ),
-        ConvTranspose( (3, 1),   4 => 2,   stride=1 )
+        ConvTranspose((3, 1), 1 => 2,            stride=2, pad=SamePad()),
+        ConvTranspose((3, 1), 2 => 4,            stride=2, pad=SamePad()),
+        ConvTranspose((3, 1), 4 => 5,            stride=2, pad=SamePad()), 
+        ConvTranspose((3, 1), 5 => out_channels, stride=2, pad=SamePad())
+
     )
 
 end
 
 
+function audio_encoder( model_size, out_channels=6 )
 
+    convolutions = Parallel( +, 
 
-export init_complex_array, DenseFFT, audio_encoder, audio_decoder
+        dilated_conv_block( 0,  out_channels=out_channels ),
+        dilated_conv_block( 1,  out_channels=out_channels ),
+        dilated_conv_block( 7,  out_channels=out_channels ), 
+        dilated_conv_block( 17, out_channels=out_channels ),
+        dilated_conv_block( 63, out_channels=out_channels ) 
+
+    )
+
+    pool = AdaptiveMeanPool((model_size, 1))
+
+    return Chain( convolutions, downsampler(out_channels), pool )
 
 end
+
+
+function audio_decoder( audio_size, in_channels=6 )
+
+    convolutions = Parallel( +, 
+
+        dilated_conv_block( 0,   in_channels=in_channels ),
+        dilated_conv_block( 1,   in_channels=in_channels ),
+        dilated_conv_block( 7,   in_channels=in_channels ), 
+        dilated_conv_block( 17,  in_channels=in_channels ),
+        dilated_conv_block( 63,  in_channels=in_channels )
+
+    )
+
+    pool = AdaptiveMeanPool((audio_size, 1))
+
+    return Chain( upsampler(in_channels), convolutions, pool )
+
+end
+
+
+export audio_encoder, audio_decoder
+
+end
+
+
+
+
+
+
+
+
+
+
