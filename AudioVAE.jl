@@ -51,7 +51,6 @@ function audio_encoder( model_size, out_channels=6 )
 
     convolutions = Parallel( +, 
 
-        dilated_conv_block( 0,  out_channels=out_channels ),
         dilated_conv_block( 1,  out_channels=out_channels ),
         dilated_conv_block( 7,  out_channels=out_channels ), 
         dilated_conv_block( 17, out_channels=out_channels ),
@@ -70,7 +69,6 @@ function audio_decoder( audio_size, in_channels=6 )
 
     convolutions = Parallel( +, 
 
-        dilated_conv_block( 0,   in_channels=in_channels ),
         dilated_conv_block( 1,   in_channels=in_channels ),
         dilated_conv_block( 7,   in_channels=in_channels ), 
         dilated_conv_block( 17,  in_channels=in_channels ),
