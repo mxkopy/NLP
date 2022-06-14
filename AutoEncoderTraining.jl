@@ -38,6 +38,8 @@ function train_autoencoder( model, optimizer, data_iterator, savename; save_freq
 
     trainmode!(model)
 
+    model      = model |> data_iterator.device
+
     loss       = (p, data) -> loss_function( model, p, data )
 
     callback   = Flux.throttle( () -> save_model( savename, model, optimizer ), save_freq )
@@ -83,6 +85,8 @@ end
 function test_autoencoder( model, data_iterator, save_function, output, num_iter )
 
     testmode!( model )
+
+    model = model |> data_iterator.device
 
     data = mapreduce( (l, r) -> cat( l, r, dims=1 ), Iterators.take( data_iterator, num_iter )) do (param, data)
 
