@@ -2,8 +2,6 @@ using FileIO, Pipe, DataStructures, Serialization, NearestNeighbors, StaticArray
 
 import Base: getindex
 
-
-
 @everywhere function parse_line( str::String; precision=Float32 )
 
     line = split(str, " ") 
