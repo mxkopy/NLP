@@ -12,7 +12,7 @@ include("Words.jl")
 
 G = GStore(path-to-glove.txt)
 ```
-Careful - due to the mechanics of memory-mapping, the GloVe vectors and keys need to be copied into different files. Which means you might run out of disk. 
+Careful - due to the mechanics of memory-mapping, the GloVe vectors and keys need to be copied into different files, so make sure you have a little more than double the size of glove.txt in disk space. 
 However, once this process is done, you can delete the original glove.txt file. 
 
 # Usage
