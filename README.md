@@ -2,7 +2,7 @@
 An implementation of the Transformer architecture + an mmaped GloVe vector store
 
 # What it does right now
-Nothing by itself. The forward-pass of the Transformer is implemented, but there's no CLI for it or a training loop (yet!). It's more or less a library implementation of arxiv.org/abs/1706.03762.
+Nothing by itself. The forward-pass of the Transformer is implemented, but there's no CLI for it or a training loop (yet!). It's more or less a library implementation of https://arxiv.org/abs/1706.03762.
 However, the GloVe vector store is pretty neat - it provides an mmapped kd-tree and (for now, a RAM) dictionary for GloVe vectors and tokens, respectively. 
 
 # How to do it
@@ -17,7 +17,7 @@ However, once this process is done, you can delete the original glove.txt file.
 Once you have the various .bin files, you can index into G like so:
 
 ```
-G["word"] = ...
+G["word"] = [1.23253, -1.24523, 0.24155, ...]
 ```
 
 or, 
@@ -25,5 +25,5 @@ or,
 ```
 vector = rand(300)
 
-G[vector] = ...
+G[vector] = "randomword"
 ```
