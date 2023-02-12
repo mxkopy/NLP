@@ -16,7 +16,7 @@ Careful - due to the mechanics of memory-mapping, the GloVe vectors and keys nee
 However, once this process is done, you can delete the original glove.txt file. 
 
 # Usage
-Once you have the various .bin files, you can index into G like so:
+Once you've built the GStore, you can index into it like so:
 
 ```
 G["word"] = [1.23253, -1.24523, 0.24155, ...]
@@ -28,4 +28,16 @@ or,
 vector = rand(300)
 
 G[vector] = "randomword"
+```
+
+You can load the various .bin files into a GStore like this:
+
+```
+GStore(values=path-to-glove.values.bin, dictionary=path-to-dictionary.bin, tree=path-to-kd_tree.bin)
+```
+
+Or, if they're in the same directory as your REPL, 
+
+```
+GStore()
 ```
