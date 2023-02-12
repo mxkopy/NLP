@@ -41,3 +41,10 @@ Or, if they're in the same directory as your REPL,
 ```
 GStore()
 ```
+
+# Dependencies
+
+Transformers.jl - Flux, SliceMap, CUDA, Zygote
+Words.jl        - FileIO, Pipe, DataStructures, Serialization, NearestNeighbors, StaticArrays, Distributed, Mmap, OrderedCollections
+
+Distributed isn't used as of right now, so feel free to remove mention of it in the code. 
