@@ -36,7 +36,7 @@ You can load the various .bin files into a GStore like this:
 GStore(values=path-to-glove.values.bin, dictionary=path-to-dictionary.bin, tree=path-to-kd_tree.bin)
 ```
 
-Or, if they're in the same directory as your REPL, 
+Or, if they're in the same directory as your REPL (the default), 
 
 ```
 GStore()
