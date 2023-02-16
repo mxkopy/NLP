@@ -1,7 +1,4 @@
-module Transformers
 # https://arxiv.org/abs/1706.03762
-
-export create_transformer, attention, head, multihead_attention, FFN_layer, MultiHead, Encoder, Decoder, Layer, Transformer, ncol, nrow, isend
 
 using Flux, SliceMap, CUDA, Zygote
 
@@ -273,8 +270,5 @@ function (transformer::Transformer)( inputs::AbstractArray, bound::Number=reduce
     end
 
     return TransformerIterator(transformer, inputs, bound)
-
-end
-
 
 end
