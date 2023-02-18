@@ -205,7 +205,7 @@ function (transformer::Transformer)(inputs::AbstractArray, outputs::AbstractArra
 
     end
 
-    return Flux.max( dec, dims=2 )
+    return getindex( dec, Flux.argmax( dec, dims=2 ) )
 
 end
 
