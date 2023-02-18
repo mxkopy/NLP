@@ -60,6 +60,29 @@ function multihead_attention( Q, K, V, QW, KW, VW, WO, masked )
 end
 
 
+function encode_position(pos::Int, d, max)
+
+    return map(1:d) do i
+
+        w = max ^ ( ((i ÷ 2) * 2) / d )
+
+        isodd(i) ? sin( pos / w ) : cos( pos / w )
+
+    end
+
+end
+
+encode_position(pos::Tuple{Int}, d, max) = encode_position(pos..., d, max)
+
+
+function encode_position(pos::Tuple{Int, Int}, d, max)
+
+    return vcat( encode_position( first(pos), d÷2, max ), encode_position( last(pos), d÷2, max ) )
+
+end
+
+isend(transformer::Transformer, token::AbstractVecOrMat) = isequal(transformer.end_token, token)
+
 # ---------------------------------------
 # stateful bits with trainable parameters
 # ---------------------------------------
@@ -185,7 +208,7 @@ Flux.@functor Layer
 
 
 
-# Inputs are assumed to be (d_m, n) size 
+# Inputs are assumed to be (model_dimensions, num_data) size 
 
 struct Transformer
 
@@ -195,7 +218,11 @@ struct Transformer
 
 end
 
-Transformer( d_m=64, d_k=8, d_v=8, h=8, depth=6; start_token=zeros(d_m, 1) .- 1, end_token=ones(d_m, 1) ) = Transformer( map( _ -> Layer(d_m, d_k, d_v, h), 1:depth ), start_token, end_token )
+function Transformer(; model_dimensions=64, key_dimensions=8, value_dimensions=8, heads=8, depth=6, start_token=zeros(model_dimensions, 1) .- 1, end_token=ones(model_dimensions, 1) )
+
+    return Transformer( map( _ -> Layer(model_dimensions, key_dimensions, value_dimensions, heads), 1:depth ), start_token, end_token )
+
+end
 
 function (transformer::Transformer)(inputs::AbstractArray, outputs::AbstractArray)
 
@@ -216,27 +243,44 @@ Flux.cpu(x::Transformer) = Transformer( x.layers |> cpu, x.start_token |> cpu, x
 
 
 
-function encode_position(pos::Int, d, max)
+# ---------------------------------
+# implementation of AIAYN ends here
+# ---------------------------------
 
-    return map(1:d) do i
 
-        w = max ^ ( ((i ÷ 2) * 2) / d )
 
-        isodd(i) ? sin( pos / w ) : cos( pos / w )
+# The following adds transformers with 'context', which is just an array prepended to the input & excluded from the output
+
+struct ContextualTransformer
+
+    context::AbstractMatrix
+    transformer::Transformer
+
+end
+
+function ContextualTransformer(; model_dimensions=64, key_dimensions=8, value_dimensions=8, heads=8, depth=6, start_token=zeros(model_dimensions, 1) .- 1, end_token=ones(model_dimensions, 1), context_size=64, context=zeros(model_dimensions, context_size) )
+
+    T = Transformer( map( _ -> Layer(model_dimensions, key_dimensions, value_dimensions, heads), 1:depth ), start_token, end_token )
+
+    return ContextualTransformer(context, T)
+
+end
+
+function (c_transformer::ContextualTransformer)(inputs::AbstractArray, bound::Int=reduce(*, size(inputs)[2:end]))
+
+    return Iterators.map( c_transformer.transformer( hcat(c_transformer.context, inputs) ) ) do output
+
+        c_transformer.context .= output[:, 1:ncol(c_transformer.context)]
+
+        return output[:, ncol(c_transformer.context)+1:end]
 
     end
 
 end
 
-encode_position(pos::Tuple{Int}, d, max) = encode_position(pos..., d, max)
+Flux.gpu(x::ContextualTransformer) = Transformer( x.context |> gpu, x.transformer |> gpu )
+Flux.cpu(x::ContextualTransformer) = Transformer( x.context |> cpu, x.transformer |> cpu )
 
-function encode_position(pos::Tuple{Int, Int}, d, max)
-
-    return vcat( encode_position( first(pos), d÷2, max ), encode_position( last(pos), d÷2, max ) )
-
-end
-
-isend(transformer::Transformer, token::AbstractVecOrMat) = isequal(transformer.end_token, token)
 
 
 struct TransformerIterator
@@ -254,14 +298,14 @@ Base.length(itr::TransformerIterator) = itr.bound
 function Base.iterate( T::TransformerIterator, outputs=T.transformer.start_token )
 
     out     = T.transformer(T.inputs, outputs)
-    outputs = cat(outputs, out, dims=2)
+    outputs = hcat(outputs, out)
 
     return ncol(outputs) > T.bound + 1 || isend(T.transformer, out) ? nothing : (outputs[:, 2:end], outputs)
 
 end
 
 
-function (transformer::Transformer)( inputs::AbstractArray, bound::Number=reduce(*, size(inputs)[2:end]) )
+function (transformer::Transformer)( inputs::AbstractArray, bound::Int=reduce(*, size(inputs)[2:end]) )
 
     inputs = mapreduce(hcat, Iterators.product( axes(inputs)[2:end]... )) do pos
 
