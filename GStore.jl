@@ -1,4 +1,4 @@
-using FileIO, Pipe, DataStructures, Serialization, NearestNeighbors, StaticArrays, Distributed, Mmap, OrderedCollections
+using FileIO, Pipe, DataStructures, Serialization, NearestNeighbors, StaticArrays, Mmap, OrderedCollections
 
 import Base: getindex
 
@@ -14,7 +14,7 @@ import Base: getindex
 
 end
 
-function split_glove(; glove="glove.txt", values_out="glove.values.bin" )
+function split_glove(; glove="data/glove.txt", values_out="data/glove.values.bin" )
 
     d = glove |> eachline |> first |> parse_line |> last |> length |> Int64
     n = parse(Int64, read(`bash -c "wc -l < $glove"`, String))
@@ -34,7 +34,7 @@ function split_glove(; glove="glove.txt", values_out="glove.values.bin" )
 
 end
 
-function create_glove_lookup_dictionary( glove::String="glove.txt" )
+function create_glove_lookup_dictionary( glove::String="data/glove.txt" )
 
     return Iterators.map( glove |> eachline |> enumerate ) do (i, line)
 
@@ -44,7 +44,7 @@ function create_glove_lookup_dictionary( glove::String="glove.txt" )
 
 end
 
-function mmap_values( values::String="glove.values.bin" )
+function mmap_values( values::String="data/glove.values.bin" )
 
     V = open(values, "r")
 
@@ -64,7 +64,7 @@ struct GStore
 
 end
 
-function GStore(; values="glove.values.bin", dictionary="dictionary.bin", tree="kd_tree.bin" )
+function GStore(; values="data/glove.values.bin", dictionary="data/dictionary.bin", tree="data/kd_tree.bin" )
 
     D = deserialize(dictionary)
     T = injectdata(deserialize(tree), mmap_values(values))
@@ -77,8 +77,8 @@ function GStore( glove::String )
 
     split_glove( glove=glove )
 
-    serialize("dictionary.bin", create_glove_lookup_dictionary( glove ))
-    serialize("kd_tree.bin", DataFreeTree(KDTree, mmap_values() )) 
+    serialize("data/dictionary.bin", create_glove_lookup_dictionary( glove ))
+    serialize("data/kd_tree.bin", DataFreeTree(KDTree, mmap_values() )) 
 
     return GStore()
 

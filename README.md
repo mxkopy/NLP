@@ -36,7 +36,7 @@ You can load the various .bin files into a GStore like this:
 GStore(values=path-to-glove.values.bin, dictionary=path-to-dictionary.bin, tree=path-to-kd_tree.bin)
 ```
 
-Or, if they're in the same directory as your REPL (the default):
+Or, if they're in the ./data directory (the default):
 
 ```
 GStore()
@@ -47,5 +47,3 @@ GStore()
 Transformers.jl : Flux, SliceMap, CUDA, Zygote
 
 Words.jl        : FileIO, Pipe, DataStructures, Serialization, NearestNeighbors, StaticArrays, Distributed, Mmap, OrderedCollections
-
-Distributed isn't used as of right now, so feel free to remove mention of it from the source. 
