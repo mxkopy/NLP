@@ -205,7 +205,7 @@ function (transformer::Transformer)(inputs::AbstractArray, outputs::AbstractArra
 
     end
 
-    return Flux.mean( dec, dims=2 )
+    return Flux.max( dec, dims=2 )
 
 end
 
